@@ -16,7 +16,7 @@ final class UpdateChecker {
     /// public key here, and store the private key as the `UPDATE_SIGNING_KEY` repo secret.
     /// While this is empty, automatic install is disabled and users are sent to the
     /// release page to download manually instead.
-    static let updatePublicKeyBase64 = ""
+    static let updatePublicKeyBase64 = "hxrTxcTmfJK6faYC8extbxsQump148JHODadFVIDONg="
 
     static var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
