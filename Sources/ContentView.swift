@@ -597,6 +597,8 @@ struct ContentView: View {
     @State private var startupToRemove: StartupItem?
     @AppStorage("hasSeenWelcomeGuide") private var hasSeenWelcomeGuide = false
     @State private var showWelcomeGuide = false
+    @AppStorage("seenTabHelpKeys") private var seenTabHelpKeys = ""
+    @State private var activeTabHelp: TabHelpInfo?
     @State private var showSelfUninstallConfirm = false
 
     private static let dateFormatter: DateFormatter = {
@@ -777,6 +779,22 @@ struct ContentView: View {
         } message: {
             Text("Files will be moved to your macOS Trash so you can recover them if needed.")
         }
+        .onChange(of: selectedTab) { newTab in
+            let key = newTab.rawValue
+            let seen = Set(seenTabHelpKeys.split(separator: "|").map(String.init))
+            if !seen.contains(key) {
+                seenTabHelpKeys = (seen.union([key])).joined(separator: "|")
+                activeTabHelp = TabHelpInfo.info(for: key)
+            }
+        }
+        .alert(activeTabHelp?.title ?? "", isPresented: Binding(
+            get: { activeTabHelp != nil },
+            set: { if !$0 { activeTabHelp = nil } }
+        )) {
+            Button("Got It", role: .cancel) {}
+        } message: {
+            Text(activeTabHelp?.message ?? "")
+        }
         .alert("Uninstall MacSweeper?", isPresented: $showSelfUninstallConfirm) {
             Button("Cancel", role: .cancel) {}
             Button("Uninstall & Quit", role: .destructive) {
@@ -819,8 +837,18 @@ struct ContentView: View {
     private var headerBar: some View {
         VStack(spacing: 12) {
             HStack {
-                Text(selectedTab.rawValue)
+                HStack(spacing: 6) {
+                        Text(selectedTab.rawValue)
                     .font(.title2.bold())
+                        Button {
+                            activeTabHelp = TabHelpInfo.info(for: selectedTab.rawValue)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("What is this tab?")
+                    }
                 Spacer()
                 if selectedTab == .systemData && !vm.visibleTargets.isEmpty {
                     Button(vm.allSafeSelected ? "Deselect Safe" : "Select All Safe") {
