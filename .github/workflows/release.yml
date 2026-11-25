@@ -93,6 +93,7 @@ jobs:
           </dict>
           </plist>
           PLIST
+          codesign --force --deep --sign - dist/MacSweeper.app
           ditto -c -k --sequesterRsrc --keepParent dist/MacSweeper.app dist/MacSweeper.zip
 
       - name: Publish GitHub Release
