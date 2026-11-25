@@ -22,13 +22,12 @@
 
 ## 🚀 How to Install
 
-### Option 1: Fastest Way (Recommended — No Mac Popups)
+### Option 1: Fastest Way via Terminal (Recommended — No Mac Popups)
 You don't need any tech experience—just copy and paste one line:
 
-1. Open **Finder** (the smiling face icon in your Dock).
-2. Click **Go** in the top menu bar → **Utilities** *(or press **Shift + ⌘ + U**)*.
-3. Double-click **Terminal** (the black icon).
-4. Copy the line below, paste it into the Terminal window, and press **Return**:
+1. Press **Command (⌘) + Space** on your keyboard, type **Terminal**, and open <img src="Assets/terminal-icon.png" alt="Terminal" width="18" height="18" align="absmiddle" /> **Terminal**.  
+   *(If Spotlight opens something else instead, open **Finder** → click **Go** in the top menu bar → **Utilities** → double-click <img src="Assets/terminal-icon.png" alt="Terminal" width="18" height="18" align="absmiddle" /> **Terminal**.)*
+2. Copy the line below, paste it into the Terminal window, and press **Return**:
 
 ```bash
 curl -fsSL [https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh](https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh) | bash
@@ -45,7 +44,9 @@ MacSweeper will automatically download, install into your **Applications** folde
 
 > **Seeing a *"MacSweeper is damaged"* message?**  
 > Don't worry—the app is not actually damaged. Because MacSweeper is a free, independent app (not sold on the Mac App Store), macOS blocks browser downloads by default.  
-> To allow it once, open **Terminal** (**Finder → Go → Utilities → Terminal**), paste this line, and press **Return**:
+> To allow it once:
+> 1. Press **Command (⌘) + Space**, type **Terminal**, and open <img src="Assets/terminal-icon.png" alt="Terminal" width="18" height="18" align="absmiddle" /> **Terminal** *(if Spotlight opens something else, open **Finder → Go → Utilities** and double-click <img src="Assets/terminal-icon.png" alt="Terminal" width="18" height="18" align="absmiddle" /> **Terminal**)*.
+> 2. Paste this line and press **Return**:
 > ```bash
 > xattr -cr /Applications/MacSweeper.app
 > ```
