@@ -1,0 +1,55 @@
+{
+  "": {
+    "dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeper.d",
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeper.o",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/primary.swiftdeps"
+  },
+  "/Users/tejasv/MacSweeper/Sources/ContentView.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/ContentView.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/ContentView.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/DockerCleaner.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/Models.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/Scanner.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/UpdateChecker.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker.dia"
+  }
+}
