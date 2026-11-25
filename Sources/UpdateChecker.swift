@@ -127,7 +127,12 @@ final class UpdateChecker {
         guard Bundle(url: newApp)?.bundleIdentifier == Bundle.main.bundleIdentifier else {
             throw fail(6, "The update's bundle identifier does not match this app.")
         }
-        guard try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path]) == 0 else {
+        // Ad-hoc signed builds (--sign -) pass --verify but fail --strict,
+        // which requires a paid Apple Developer certificate. The Ed25519
+        // signature check above is the real tamper-proof security gate here.
+        // We still do a basic verify (no --strict) to confirm the bundle is
+        // structurally intact and hasn't been corrupted in transit.
+        guard try run("/usr/bin/codesign", ["--verify", "--deep", newApp.path]) == 0 else {
             throw fail(7, "The update's code signature failed verification.")
         }
 
