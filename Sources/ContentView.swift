@@ -1,6 +1,30 @@
 import SwiftUI
 import AppKit
 
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 enum SidebarTab: String, CaseIterable, Identifiable {
     case overview = "Overview"
     case systemData = "System Data"
@@ -76,6 +100,7 @@ final class SweeperViewModel: ObservableObject {
     @Published var history: [HistoryRow] = []
     @Published var lastScanDate: Date?
     @Published var appSort: AppSort = .size
+    @Published var appearanceMode: AppAppearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearanceMode") ?? "system") ?? .system
     private var historyObserver: NSObjectProtocol?
 
     @Published var showUpdateAlert = false
@@ -423,6 +448,11 @@ func toggleSelectAllSafe() {
                 self.statusMessage = "Update failed: \(error.localizedDescription)"
             }
         }
+    }
+
+    func setAppearance(_ mode: AppAppearance) {
+        appearanceMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "appearanceMode")
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -962,9 +992,11 @@ struct ContentView: View {
                 smartDeleteEnabled: $vm.smartDeleteEnabled,
                 weeklyReminderEnabled: $vm.weeklyReminderEnabled,
                 launchAtLogin: $vm.launchAtLogin,
+                appearanceMode: $vm.appearanceMode,
                 onToggleSmartDelete: { vm.setSmartDeleteEnabled($0) },
                 onToggleReminder: { vm.setWeeklyReminder($0) },
                 onToggleLogin: { vm.setLaunchAtLogin($0) },
+                onSetAppearance: { vm.setAppearance($0) },
                 onCheckUpdates: { vm.checkForUpdates() },
                 onUninstall: { showSelfUninstallConfirm = true }
             )

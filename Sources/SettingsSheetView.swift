@@ -6,9 +6,11 @@ struct SettingsSheetView: View {
     @Binding var smartDeleteEnabled: Bool
     @Binding var weeklyReminderEnabled: Bool
     @Binding var launchAtLogin: Bool
+    @Binding var appearanceMode: AppAppearance
     let onToggleSmartDelete: (Bool) -> Void
     let onToggleReminder: (Bool) -> Void
     let onToggleLogin: (Bool) -> Void
+    let onSetAppearance: (AppAppearance) -> Void
     let onCheckUpdates: () -> Void
     let onUninstall: () -> Void
 
@@ -46,6 +48,19 @@ struct SettingsSheetView: View {
                     onToggleLogin(val)
                 }
             ))
+
+            Picker("Appearance", selection: Binding(
+                get: { appearanceMode },
+                set: { val in
+                    appearanceMode = val
+                    onSetAppearance(val)
+                }
+            )) {
+                ForEach(AppAppearance.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
 
             Divider()
 

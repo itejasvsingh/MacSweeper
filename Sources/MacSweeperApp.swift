@@ -17,6 +17,7 @@ struct MacSweeperApp: App {
     var body: some Scene {
         Window("MacSweeper", id: "main") {
             ContentView(vm: vm)
+                .preferredColorScheme(vm.appearanceMode.colorScheme)
         }
         .windowStyle(.titleBar)
 
