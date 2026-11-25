@@ -2,17 +2,18 @@
 
 A lightweight, native SwiftUI macOS utility to reclaim "System Data", clean Docker storage, and completely uninstall apps.
 
-## Download
+## Quick Install (Recommended)
+Run this single command in **Terminal**—it downloads the latest release, installs it to `/Applications`, and avoids macOS Gatekeeper warnings:
+
+```bash
+curl -fsSL [https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh](https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh) | bash
+```
+
+## Manual Download
 - **[Download Latest Release (MacSweeper.zip)](https://github.com/itejasvsingh/MacSweeper/releases/latest/download/MacSweeper.zip)**
 - [View All Releases](https://github.com/itejasvsingh/MacSweeper/releases/latest)
 
-## Installation
-1. Unzip **MacSweeper.zip** and drag **MacSweeper.app** into your **Applications** folder.
-2. Because this is an unsigned open-source build, run this once in **Terminal** if macOS Gatekeeper blocks the first launch:
-   ```bash
-   xattr -cr /Applications/MacSweeper.app
-   ```
-3. Open **MacSweeper** and click **Full Disk Access** in the top bar if you want it to scan protected messaging folders (WhatsApp/Telegram).
+*(If you download via a browser instead of Terminal, drag **MacSweeper.app** to **Applications** and run `xattr -cr /Applications/MacSweeper.app` once.)*
 
 ## Features
 - **System Data Cleaner:** Scans Claude Desktop VM bundles, Ollama models, UTM VMs, Xcode DerivedData, iOS Simulators, npm/pip/Homebrew caches, and messaging caches with plain-English safety badges.
