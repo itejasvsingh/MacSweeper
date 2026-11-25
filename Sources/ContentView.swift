@@ -166,7 +166,29 @@ final class SweeperViewModel: ObservableObject {
         }
     }
 
-    func toggleSelectAllSafe() {
+    func cleanAllSafeTargets() {
+    let safeURLs = visibleTargets
+        .filter { $0.safety == .safe && !ignoredKeys.contains("target:\($0.name)") }
+        .flatMap { $0.paths }
+    guard !safeURLs.isEmpty else {
+        statusMessage = "No safe junk items found to clean."
+        return
+    }
+
+    statusMessage = "Cleaning all safe items..."
+    Task.detached(priority: .userInitiated) {
+        let result = FileScanner.cleanTargetContents(urls: safeURLs)
+        let freedText = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
+        await MainActor.run {
+            self.statusMessage = result.errors.isEmpty
+                ? "Cleaned \(freedText) of safe junk. Click Empty Trash to reclaim disk space."
+                : "Cleaned \(freedText) of safe junk (\(result.errors.joined(separator: "; ")))."
+            self.runFullScan()
+        }
+    }
+}
+
+func toggleSelectAllSafe() {
         let shouldSelect = !allSafeSelected
         for idx in targets.indices where targets[idx].safety == .safe && !ignoredKeys.contains("target:\(targets[idx].name)") {
             targets[idx].isSelected = shouldSelect
@@ -908,7 +930,15 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                 }
 
-                Button {
+                    Button {
+                        vm.cleanAllSafeTargets()
+                    } label: {
+                        Label("Clean All Safe", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button {
                     vm.runFullScan()
                 } label: {
                     if vm.isScanning {
