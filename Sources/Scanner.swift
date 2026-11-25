@@ -182,16 +182,13 @@ final class FileScanner {
                 let children = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [])) ?? []
                 for child in children {
                     let sz = sizeOf(child)
+                    // Only ever move to Trash. If that fails, skip the item rather than
+                    // deleting it permanently, so everything cleaned stays recoverable.
                     do {
                         try fm.trashItem(at: child, resultingItemURL: nil)
                         freed += sz
                     } catch {
-                        do {
-                            try fm.removeItem(at: child)
-                            freed += sz
-                        } catch {
-                            skipped += 1
-                        }
+                        skipped += 1
                     }
                 }
             } else {
@@ -205,7 +202,7 @@ final class FileScanner {
             }
         }
 
-        let errors = skipped > 0 ? ["Skipped \(skipped) macOS-protected item(s)"] : []
+        let errors = skipped > 0 ? ["Skipped \(skipped) item(s) that couldn't be moved to Trash (in use or protected by macOS)"] : []
         return (freed, errors)
     }
 

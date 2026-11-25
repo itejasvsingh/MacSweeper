@@ -882,7 +882,7 @@ struct ContentView: View {
                 vm.pruneDocker()
             }
         } message: {
-            Text("This removes all stopped containers, unused images, and build caches. Active containers and named volumes stay untouched.")
+            Text("This removes stopped containers, unused networks, dangling (untagged) images, and build cache. Tagged images, active containers, and volumes stay untouched.")
         }
         .alert(item: $appToUninstall) { app in
             let selectedCount = app.relatedFiles.filter { $0.isSelected }.count

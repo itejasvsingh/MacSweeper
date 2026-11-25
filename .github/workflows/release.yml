@@ -107,10 +107,25 @@ jobs:
           codesign --force --deep --sign - dist/MacSweeper.app
           ditto -c -k --sequesterRsrc --keepParent dist/MacSweeper.app dist/MacSweeper.zip
 
+      - name: Checksum and sign release zip
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          (cd dist && shasum -a 256 MacSweeper.zip > MacSweeper.zip.sha256)
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            swift scripts/sign-update.swift dist/MacSweeper.zip > dist/MacSweeper.zip.sig
+          else
+            echo "::warning::UPDATE_SIGNING_KEY secret not set; release will not support in-app auto-install."
+          fi
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.APP_VERSION }}
           name: MacSweeper v${{ env.APP_VERSION }}
           generate_release_notes: true
-          files: dist/MacSweeper.zip
+          fail_on_unmatched_files: false
+          files: |
+            dist/MacSweeper.zip
+            dist/MacSweeper.zip.sha256
+            dist/MacSweeper.zip.sig

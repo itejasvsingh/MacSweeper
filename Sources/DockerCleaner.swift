@@ -55,7 +55,9 @@ final class DockerCleaner {
     }
 
     static func pruneAll() -> String {
-        let res = runDocker(args: ["system", "prune", "-a", "-f"])
+        // No "-a": only dangling images are removed, so tagged images the user
+        // pulled on purpose survive. "-f" is fine because the UI confirms first.
+        let res = runDocker(args: ["system", "prune", "-f"])
         return res.output.isEmpty ? "Docker prune completed." : res.output
     }
 }

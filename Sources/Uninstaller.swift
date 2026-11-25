@@ -83,12 +83,15 @@ final class AppUninstaller {
         return found.sorted { $0.size > $1.size }
     }
 
-    static func removeSystemWideItems(urls: [URL]) -> (freed: Int64, error: String?) {
+    /// `preCommands` run first (as root) and their failures are ignored — used to
+    /// unload launchd jobs before their plists are moved.
+    static func removeSystemWideItems(urls: [URL], preCommands: [String] = []) -> (freed: Int64, error: String?) {
         guard !urls.isEmpty else { return (0, nil) }
 
         let trashDir = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash").path
         var totalSize: Int64 = 0
         var shellCommands: [String] = []
+        let prefix = preCommands.map { "\($0) >/dev/null 2>&1; " }.joined()
 
         for url in urls {
             guard fm.fileExists(atPath: url.path) else { continue }
@@ -100,7 +103,7 @@ final class AppUninstaller {
 
         guard !shellCommands.isEmpty else { return (0, nil) }
 
-        let combined = shellCommands.joined(separator: " && ")
+        let combined = prefix + shellCommands.joined(separator: " && ")
         let escapedForAS = combined
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -128,7 +131,7 @@ final class AppUninstaller {
         }
     }
 
-    private static func shellEscape(_ path: String) -> String {
+    static func shellEscape(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
