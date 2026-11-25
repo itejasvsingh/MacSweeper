@@ -315,7 +315,7 @@ final class SweeperViewModel: ObservableObject {
         if appPath.hasSuffix(".app") {
             let escapedApp = appPath.replacingOccurrences(of: "'", with: "'\\''")
             let escapedPref = prefPath.replacingOccurrences(of: "'", with: "'\\''")
-            script = "sleep 1; rm -f '\(escapedPref)'; osascript -e 'tell application \"Finder\" to delete POSIX file \"\(escapedApp)\"' >/dev/null 2>&1 || mv '\(escapedApp)' \"$HOME/.Trash/MacSweeper-\$(date +%s).app\""
+            script = "sleep 1; rm -f '\(escapedPref)'; osascript -e 'tell application \"Finder\" to delete POSIX file \"\(escapedApp)\"' >/dev/null 2>&1 || mv '\(escapedApp)' \"$HOME/.Trash/MacSweeper-$(date +%s).app\""
         } else {
             let escapedPref = prefPath.replacingOccurrences(of: "'", with: "'\\''")
             script = "sleep 1; rm -f '\(escapedPref)'"
