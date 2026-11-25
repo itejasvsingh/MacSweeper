@@ -1,17 +1,6 @@
 import Foundation
 import AppKit
 
-struct GitHubAsset: Decodable {
-    let name: String
-    let browser_download_url: String
-}
-
-struct GitHubRelease: Decodable {
-    let tag_name: String
-    let html_url: String
-    let assets: [GitHubAsset]
-}
-
 enum UpdateCheckResult {
     case updateAvailable(version: String, downloadURL: URL, isZip: Bool)
     case upToDate(current: String)
@@ -19,104 +8,94 @@ enum UpdateCheckResult {
 }
 
 final class UpdateChecker {
-    static let repo = "itejasvsingh/MacSweeper"
+    private static let repo = "itejasvsingh/MacSweeper"
 
     static var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.5.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 
     static func checkForUpdates() async -> UpdateCheckResult {
-        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
-            return .error("Invalid GitHub repository URL.")
+        guard let latestURL = URL(string: "https://github.com/\(repo)/releases/latest") else {
+            return .error("Invalid update URL.")
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        var request = URLRequest(url: latestURL)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 15
         request.setValue("MacSweeper/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode == 404 {
-                return .error("No GitHub Releases found yet for \(repo).")
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return .error("Invalid response from GitHub.")
             }
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            guard (200...399).contains(http.statusCode), let finalURL = http.url else {
                 return .error("GitHub returned HTTP \(http.statusCode).")
             }
 
-            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-            let latest = release.tag_name.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
-            let current = currentVersion.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
-
-            if isVersion(latest, newerThan: current) {
-                if let zipAsset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".zip") }),
-                   let zipURL = URL(string: zipAsset.browser_download_url) {
-                    return .updateAvailable(version: latest, downloadURL: zipURL, isZip: true)
-                }
-                if let fallback = URL(string: release.html_url) {
-                    return .updateAvailable(version: latest, downloadURL: fallback, isZip: false)
-                }
+            let tag = finalURL.lastPathComponent
+            guard !tag.isEmpty, tag != "releases", tag != "latest" else {
+                return .upToDate(current: currentVersion)
             }
-            return .upToDate(current: current)
+
+            let latestVersion = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+
+            if latestVersion.compare(currentVersion, options: .numeric) == .orderedDescending {
+                let zipURL = URL(string: "https://github.com/\(repo)/releases/download/\(tag)/MacSweeper.zip")!
+                return .updateAvailable(version: latestVersion, downloadURL: zipURL, isZip: true)
+            } else {
+                return .upToDate(current: currentVersion)
+            }
         } catch {
-            return .error("Could not reach GitHub: \(error.localizedDescription)")
+            return .error("Network error: \(error.localizedDescription)")
         }
     }
 
-    static func installZipUpdate(from zipURL: URL) async throws {
-        let fm = FileManager.default
-        let tempDir = URL(fileURLWithPath: "/tmp/MacSweeperUpdate-\(UUID().uuidString)")
-        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    static func installZipUpdate(from url: URL) async throws {
+        let (tempZip, response) = try await URLSession.shared.download(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw NSError(domain: "UpdateChecker", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to download update zip."])
+        }
 
-        let (downloadedFile, _) = try await URLSession.shared.download(from: zipURL)
-        let localZip = tempDir.appendingPathComponent("MacSweeper.zip")
-        try fm.moveItem(at: downloadedFile, to: localZip)
+        let fm = FileManager.default
+        let workDir = fm.temporaryDirectory.appendingPathComponent("MacSweeperUpdate-\(UUID().uuidString)")
+        try fm.createDirectory(at: workDir, withIntermediateDirectories: true)
 
         let unzip = Process()
         unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        unzip.arguments = ["-xk", localZip.path, tempDir.path]
+        unzip.arguments = ["-x", "-k", tempZip.path, workDir.path]
         try unzip.run()
         unzip.waitUntilExit()
-        guard unzip.terminationStatus == 0 else {
-            throw NSError(domain: "MacSweeper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to extract update zip."])
+
+        let newApp = workDir.appendingPathComponent("MacSweeper.app")
+        guard fm.fileExists(atPath: newApp.path) else {
+            throw NSError(domain: "UpdateChecker", code: 2, userInfo: [NSLocalizedDescriptionKey: "MacSweeper.app not found inside update zip."])
         }
 
-        let newAppPath = tempDir.appendingPathComponent("MacSweeper.app").path
-        guard fm.fileExists(atPath: newAppPath) else {
-            throw NSError(domain: "MacSweeper", code: 2, userInfo: [NSLocalizedDescriptionKey: "MacSweeper.app not found inside update zip."])
-        }
+        let targetApp = Bundle.main.bundleURL.path.hasSuffix(".app")
+            ? Bundle.main.bundleURL.path
+            : "/Applications/MacSweeper.app"
 
-        let targetAppPath = Bundle.main.bundlePath.hasSuffix(".app") ? Bundle.main.bundlePath : "/Applications/MacSweeper.app"
-        let pid = ProcessInfo.processInfo.processIdentifier
+        let escapedNew = newApp.path.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedTarget = targetApp.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedWork = workDir.path.replacingOccurrences(of: "'", with: "'\\''")
 
-        // Detached shell script waits for current app to exit, swaps the bundle, clears quarantine, and relaunches
         let script = """
-        while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
-        rm -rf '\(targetAppPath)'
-        mv '\(newAppPath)' '\(targetAppPath)'
-        xattr -cr '\(targetAppPath)' 2>/dev/null || true
-        rm -rf '\(tempDir.path)'
-        open '\(targetAppPath)'
+        sleep 1
+        rm -rf '\(escapedTarget)'
+        mv '\(escapedNew)' '\(escapedTarget)'
+        xattr -cr '\(escapedTarget)' 2>/dev/null || true
+        open '\(escapedTarget)'
+        rm -rf '\(escapedWork)'
         """
 
-        let updater = Process()
-        updater.executableURL = URL(fileURLWithPath: "/bin/sh")
-        updater.arguments = ["-c", script]
-        try updater.run()
+        let launcher = Process()
+        launcher.executableURL = URL(fileURLWithPath: "/bin/sh")
+        launcher.arguments = ["-c", script]
+        try launcher.run()
 
         await MainActor.run {
             NSApp.terminate(nil)
         }
-    }
-
-    private static func isVersion(_ a: String, newerThan b: String) -> Bool {
-        let aParts = a.split(separator: ".").compactMap { Int($0) }
-        let bParts = b.split(separator: ".").compactMap { Int($0) }
-        let count = max(aParts.count, bParts.count)
-        for i in 0..<count {
-            let av = i < aParts.count ? aParts[i] : 0
-            let bv = i < bParts.count ? bParts[i] : 0
-            if av != bv { return av > bv }
-        }
-        return false
     }
 }
