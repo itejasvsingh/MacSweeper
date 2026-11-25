@@ -151,6 +151,64 @@ final class FileScanner {
         return results.sorted { $0.sizeBytes > $1.sizeBytes }
     }
 
+    static func cleanTargetContents(urls: [URL]) -> (freed: Int64, errors: [String]) {
+        let fm = FileManager.default
+        var freed: Int64 = 0
+        var skipped = 0
+
+        func sizeOf(_ url: URL) -> Int64 {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return 0 }
+            if !isDir.boolValue {
+                return (try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey]))
+                    .map { Int64($0.totalFileAllocatedSize ?? $0.fileSize ?? 0) } ?? 0
+            }
+            var total: Int64 = 0
+            if let en = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey], options: [], errorHandler: { _, _ in true }) {
+                for case let f as URL in en {
+                    if let v = try? f.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey]) {
+                        total += Int64(v.totalFileAllocatedSize ?? v.fileSize ?? 0)
+                    }
+                }
+            }
+            return total
+        }
+
+        for url in urls {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
+
+            if isDir.boolValue {
+                let children = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [])) ?? []
+                for child in children {
+                    let sz = sizeOf(child)
+                    do {
+                        try fm.trashItem(at: child, resultingItemURL: nil)
+                        freed += sz
+                    } catch {
+                        do {
+                            try fm.removeItem(at: child)
+                            freed += sz
+                        } catch {
+                            skipped += 1
+                        }
+                    }
+                }
+            } else {
+                let sz = sizeOf(url)
+                do {
+                    try fm.trashItem(at: url, resultingItemURL: nil)
+                    freed += sz
+                } catch {
+                    skipped += 1
+                }
+            }
+        }
+
+        let errors = skipped > 0 ? ["Skipped \(skipped) macOS-protected item(s)"] : []
+        return (freed, errors)
+    }
+
     static func moveToTrash(urls: [URL]) -> (freed: Int64, errors: [String]) {
         var freed: Int64 = 0
         var errors: [String] = []

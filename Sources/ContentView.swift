@@ -474,13 +474,19 @@ final class SweeperViewModel: ObservableObject {
         let urls = visibleTargets.filter { $0.isSelected }.flatMap { $0.paths }
         guard !urls.isEmpty else { return }
 
-        let result = FileScanner.moveToTrash(urls: urls)
-        if result.errors.isEmpty {
-            statusMessage = "Moved \(formatBytes(result.freed)) to Trash. Click Empty Trash to reclaim disk space."
-        } else {
-            statusMessage = "Moved \(formatBytes(result.freed)) to Trash with warnings: \(result.errors.joined(separator: "; "))"
+        statusMessage = "Cleaning selected items..."
+        Task.detached(priority: .userInitiated) {
+            let result = FileScanner.cleanTargetContents(urls: urls)
+            let freedText = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
+            await MainActor.run {
+                if result.errors.isEmpty {
+                    self.statusMessage = "Cleaned \(freedText). Click Empty Trash to reclaim disk space."
+                } else {
+                    self.statusMessage = "Cleaned \(freedText) (\(result.errors.joined(separator: "; ")))."
+                }
+                self.runFullScan()
+            }
         }
-        runFullScan()
     }
 
     func cleanSelectedLargeFiles() {
