@@ -51,6 +51,22 @@ struct InstalledApp: Identifiable {
     let appSize: Int64
     var relatedFiles: [RelatedFile]
     var isRunning: Bool
+    /// When the app was last opened, from Spotlight. nil if macOS doesn't know.
+    var lastUsed: Date? = nil
+
+    /// Not opened for 6+ months.
+    var isUnused: Bool {
+        guard let lastUsed = lastUsed,
+              let cutoff = Calendar.current.date(byAdding: .month, value: -6, to: Date()) else { return false }
+        return lastUsed < cutoff
+    }
+
+    var lastUsedText: String {
+        guard let lastUsed = lastUsed else { return "Last opened: unknown" }
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return "Last opened \(f.localizedString(for: lastUsed, relativeTo: Date()))"
+    }
 
     var totalSize: Int64 {
         appSize + relatedFiles.reduce(0) { $0 + $1.size }
@@ -68,6 +84,13 @@ struct OrphanFolder: Identifiable {
     let location: String
     let size: Int64
     var isSelected: Bool = false
+}
+
+enum AppSort: String, CaseIterable, Identifiable {
+    case size = "Size"
+    case unused = "Least Used"
+    case name = "Name"
+    var id: String { rawValue }
 }
 
 func formatBytes(_ bytes: Int64) -> String {

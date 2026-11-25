@@ -97,18 +97,20 @@ struct BrowserCleanerView: View {
             let fm = FileManager.default
             var freed: Int64 = 0
             var skipped = 0
+            var moved: [TrashedItem] = []
             for dir in selected {
                 let children = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
                 for child in children {
                     let size = folderSize(child)
                     do {
-                        try fm.trashItem(at: child, resultingItemURL: nil)
+                        if let item = try fm.trashItemRecording(at: child) { moved.append(item) }
                         freed += size
                     } catch {
                         skipped += 1
                     }
                 }
             }
+            HistoryManager.shared.add(title: "Cleaned browser caches", bytes: freed, items: moved)
             DispatchQueue.main.async {
                 let freedText = ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)
                 status = skipped == 0

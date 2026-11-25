@@ -83,15 +83,63 @@ final class FileScanner {
                 paths: [lib.appendingPathComponent("Developer/CoreSimulator/Devices")]
             ),
             CleanupTarget(
-                name: "Package Manager Caches (npm, pip, HF)",
+                name: "Xcode Archives",
+                category: .developer,
+                safety: .review,
+                explanation: "Builds you archived for App Store or TestFlight. Keep the ones you may need to symbolicate crash reports.",
+                paths: [lib.appendingPathComponent("Developer/Xcode/Archives")]
+            ),
+            CleanupTarget(
+                name: "iOS Device Support Files",
                 category: .developer,
                 safety: .safe,
-                explanation: "Cached installers and model downloads. Zero impact on your already-installed projects.",
+                explanation: "Debug symbols copied from every iPhone/iPad you've connected. Xcode re-copies them the next time you plug a device in.",
+                paths: [
+                    lib.appendingPathComponent("Developer/Xcode/iOS DeviceSupport"),
+                    lib.appendingPathComponent("Developer/Xcode/watchOS DeviceSupport")
+                ]
+            ),
+            CleanupTarget(
+                name: "JavaScript Package Caches (npm, Yarn, pnpm)",
+                category: .developer,
+                safety: .safe,
+                explanation: "Downloaded package tarballs. Installed node_modules in your projects aren't touched; packages re-download when needed.",
                 paths: [
                     home.appendingPathComponent(".npm/_cacache"),
-                    lib.appendingPathComponent("Caches/pip"),
-                    home.appendingPathComponent(".cache")
+                    lib.appendingPathComponent("Caches/Yarn"),
+                    lib.appendingPathComponent("pnpm/store")
                 ]
+            ),
+            CleanupTarget(
+                name: "Python Caches (pip, Conda)",
+                category: .developer,
+                safety: .safe,
+                explanation: "Downloaded wheels and Conda package archives. Existing virtual environments keep working.",
+                paths: [
+                    lib.appendingPathComponent("Caches/pip"),
+                    home.appendingPathComponent("miniconda3/pkgs"),
+                    home.appendingPathComponent("anaconda3/pkgs"),
+                    home.appendingPathComponent("opt/anaconda3/pkgs")
+                ]
+            ),
+            CleanupTarget(
+                name: "Gradle, CocoaPods, Cargo & Go Caches",
+                category: .developer,
+                safety: .safe,
+                explanation: "Dependency download caches for Android/Java, iOS, Rust, and Go. The next build re-downloads what it needs.",
+                paths: [
+                    home.appendingPathComponent(".gradle/caches"),
+                    lib.appendingPathComponent("Caches/CocoaPods"),
+                    home.appendingPathComponent(".cargo/registry/cache"),
+                    home.appendingPathComponent("go/pkg/mod/cache")
+                ]
+            ),
+            CleanupTarget(
+                name: "Shared Tool Cache (~/.cache)",
+                category: .developer,
+                safety: .review,
+                explanation: "Used by many command-line tools, including Hugging Face models, which can be large to re-download.",
+                paths: [home.appendingPathComponent(".cache")]
             ),
             CleanupTarget(
                 name: "Homebrew Download Cache",
@@ -165,10 +213,11 @@ final class FileScanner {
         return results.sorted { $0.sizeBytes > $1.sizeBytes }
     }
 
-    static func cleanTargetContents(urls: [URL]) -> (freed: Int64, errors: [String]) {
+    static func cleanTargetContents(urls: [URL]) -> (freed: Int64, errors: [String], moved: [TrashedItem]) {
         let fm = FileManager.default
         var freed: Int64 = 0
         var skipped = 0
+        var moved: [TrashedItem] = []
 
         func sizeOf(_ url: URL) -> Int64 {
             var isDir: ObjCBool = false
@@ -199,7 +248,7 @@ final class FileScanner {
                     // Only ever move to Trash. If that fails, skip the item rather than
                     // deleting it permanently, so everything cleaned stays recoverable.
                     do {
-                        try fm.trashItem(at: child, resultingItemURL: nil)
+                        if let item = try fm.trashItemRecording(at: child) { moved.append(item) }
                         freed += sz
                     } catch {
                         skipped += 1
@@ -208,7 +257,7 @@ final class FileScanner {
             } else {
                 let sz = sizeOf(url)
                 do {
-                    try fm.trashItem(at: url, resultingItemURL: nil)
+                    if let item = try fm.trashItemRecording(at: url) { moved.append(item) }
                     freed += sz
                 } catch {
                     skipped += 1
@@ -217,23 +266,24 @@ final class FileScanner {
         }
 
         let errors = skipped > 0 ? ["Skipped \(skipped) item(s) that couldn't be moved to Trash (in use or protected by macOS)"] : []
-        return (freed, errors)
+        return (freed, errors, moved)
     }
 
-    static func moveToTrash(urls: [URL]) -> (freed: Int64, errors: [String]) {
+    static func moveToTrash(urls: [URL]) -> (freed: Int64, errors: [String], moved: [TrashedItem]) {
         var freed: Int64 = 0
         var errors: [String] = []
+        var moved: [TrashedItem] = []
 
         for url in urls {
             guard fm.fileExists(atPath: url.path) else { continue }
             let size = directorySize(at: url)
             do {
-                try fm.trashItem(at: url, resultingItemURL: nil)
+                if let item = try fm.trashItemRecording(at: url) { moved.append(item) }
                 freed += size
             } catch {
                 errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
             }
         }
-        return (freed, errors)
+        return (freed, errors, moved)
     }
 }

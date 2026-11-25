@@ -1,0 +1,16 @@
+name: Build check
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build (debug)
+        run: swift build
+      - name: Build (release)
+        run: swift build -c release

@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import CoreServices
 
 final class AppUninstaller {
     static let fm = FileManager.default
@@ -33,11 +34,18 @@ final class AppUninstaller {
                     appURL: url,
                     appSize: appSize,
                     relatedFiles: related,
-                    isRunning: isRunning
+                    isRunning: isRunning,
+                    lastUsed: lastUsedDate(for: url)
                 ))
             }
         }
         return apps.sorted { $0.totalSize > $1.totalSize }
+    }
+
+    /// Spotlight's "Last opened" date for an app bundle.
+    static func lastUsedDate(for url: URL) -> Date? {
+        guard let item = MDItemCreateWithURL(kCFAllocatorDefault, url as CFURL) else { return nil }
+        return MDItemCopyAttribute(item, kMDItemLastUsedDate) as? Date
     }
 
     static func findRelatedFiles(appName: String, bundleId: String) -> [RelatedFile] {

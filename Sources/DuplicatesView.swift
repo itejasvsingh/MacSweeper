@@ -140,7 +140,10 @@ struct DuplicatesView: View {
 
     private func trashFile(_ url: URL, in groupID: UUID) {
         do {
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            if let item = try FileManager.default.trashItemRecording(at: url) {
+                HistoryManager.shared.add(title: "Trashed duplicate \(url.lastPathComponent)", bytes: size, items: [item])
+            }
             status = "Moved \(url.lastPathComponent) to Trash."
         } catch {
             status = "Couldn't move \(url.lastPathComponent) to Trash: \(error.localizedDescription)"

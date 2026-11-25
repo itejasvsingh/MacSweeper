@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SidebarTab: String, CaseIterable, Identifiable {
+    case overview = "Overview"
     case systemData = "System Data"
     case largeFiles = "Large & Old Files"
     case docker = "Docker"
@@ -13,10 +14,13 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     case duplicates = "Duplicates"
     case spaceLens = "Space Lens"
     case processes = "RAM & CPU"
+    case history = "Cleaning History"
 
     var id: String { rawValue }
     var icon: String {
         switch self {
+        case .overview: return "gauge.with.dots.needle.33percent"
+        case .history: return "clock.arrow.circlepath"
         case .systemData: return "internaldrive"
         case .largeFiles: return "doc.text.magnifyingglass"
         case .docker: return "shippingbox"
@@ -69,6 +73,10 @@ final class SweeperViewModel: ObservableObject {
     @Published var smartDeleteEnabled: Bool = UserDefaults.standard.object(forKey: "smartDeleteEnabled") as? Bool ?? true
     @Published var smartDeletePrompt: SmartDeletePrompt?
     @Published var weeklyReminderEnabled: Bool = ReminderManager.isEnabled
+    @Published var history: [HistoryRow] = []
+    @Published var lastScanDate: Date?
+    @Published var appSort: AppSort = .size
+    private var historyObserver: NSObjectProtocol?
 
     @Published var showUpdateAlert = false
     @Published var updateAlertTitle = ""
@@ -101,10 +109,79 @@ final class SweeperViewModel: ObservableObject {
 
     var filteredApps: [InstalledApp] {
         let query = appSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return apps }
-        return apps.filter {
+        let matched = query.isEmpty ? apps : apps.filter {
             $0.name.lowercased().contains(query) || $0.bundleId.lowercased().contains(query)
         }
+        switch appSort {
+        case .size:
+            return matched.sorted { $0.totalSize > $1.totalSize }
+        case .name:
+            return matched.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .unused:
+            // Oldest "last opened" first; apps macOS has no date for go last.
+            return matched.sorted { ($0.lastUsed ?? .distantFuture) < ($1.lastUsed ?? .distantFuture) }
+        }
+    }
+
+    // MARK: Overview totals
+
+    var hasScanned: Bool { lastScanDate != nil }
+
+    var safeReclaimableBytes: Int64 {
+        visibleTargets.filter { $0.safety == .safe }.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var reviewReclaimableBytes: Int64 {
+        visibleTargets.filter { $0.safety != .safe }.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var largeFilesBytes: Int64 {
+        visibleLargeFiles.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var unusedApps: [InstalledApp] {
+        apps.filter { $0.isUnused }
+    }
+
+    var unusedAppsBytes: Int64 {
+        unusedApps.reduce(0) { $0 + $1.totalSize }
+    }
+
+    var orphanBytes: Int64 {
+        visibleOrphans.reduce(0) { $0 + $1.size }
+    }
+
+    // MARK: Cleaning history
+
+    func reloadHistory() {
+        Task.detached(priority: .utility) {
+            let rows = HistoryManager.shared.records().map {
+                HistoryRow(record: $0, restorableCount: HistoryManager.restorableItems(in: $0).count)
+            }
+            await MainActor.run { self.history = rows }
+        }
+    }
+
+    func restore(_ row: HistoryRow) {
+        statusMessage = "Restoring \(row.record.title)..."
+        let id = row.record.id
+        Task.detached(priority: .userInitiated) {
+            let result = HistoryManager.shared.restore(id)
+            await MainActor.run {
+                if result.failed.isEmpty {
+                    self.statusMessage = "Restored \(result.restored) item(s) to their original location."
+                } else {
+                    self.statusMessage = "Restored \(result.restored) item(s). Couldn't restore \(result.failed.count): \(result.failed.prefix(3).joined(separator: "; "))"
+                }
+                self.refreshPermissionsAndTrash()
+                self.reloadHistory()
+            }
+        }
+    }
+
+    func clearHistory() {
+        HistoryManager.shared.clear()
+        statusMessage = "Cleared cleaning history. Items already in the Trash stay there."
     }
 
     var allSafeSelected: Bool {
@@ -117,6 +194,12 @@ final class SweeperViewModel: ObservableObject {
         refreshPermissionsAndTrash()
         checkForUpdates(silentIfUpToDate: true)
         setupTrashWatcher()
+        reloadHistory()
+        historyObserver = NotificationCenter.default.addObserver(
+            forName: .cleanupHistoryChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.reloadHistory() }
+        }
     }
 
     func ignoreItem(key: String, label: String) {
@@ -174,6 +257,7 @@ final class SweeperViewModel: ObservableObject {
 
         let userResult = FileScanner.moveToTrash(urls: userURLs)
         var totalFreed = userResult.freed
+        HistoryManager.shared.add(title: "Leftovers of \(prompt.appName)", bytes: userResult.freed, items: userResult.moved)
         if !systemURLs.isEmpty {
             let sysResult = AppUninstaller.removeSystemWideItems(urls: systemURLs)
             totalFreed += sysResult.freed
@@ -204,6 +288,7 @@ final class SweeperViewModel: ObservableObject {
     statusMessage = "Cleaning all safe items..."
     Task.detached(priority: .userInitiated) {
         let result = FileScanner.cleanTargetContents(urls: safeURLs)
+        HistoryManager.shared.add(title: "Cleaned all Safe items", bytes: result.freed, items: result.moved)
         let freedText = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
         await MainActor.run {
             self.statusMessage = result.errors.isEmpty
@@ -231,6 +316,7 @@ func toggleSelectAllSafe() {
                 self.trashSizeBytes = trash
                 self.availableDisk = space.available
                 self.totalDisk = space.total
+                self.reloadHistory()
                 if result.errors.isEmpty {
                     self.statusMessage = "Emptied Trash — reclaimed \(formatBytes(result.freed))."
                 } else {
@@ -349,6 +435,9 @@ func toggleSelectAllSafe() {
         LoginItemManager.setEnabled(false)
         ReminderManager.setEnabled(false)
         trashWatcher?.stop()
+        if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? FileManager.default.trashItem(at: support.appendingPathComponent("MacSweeper"), resultingItemURL: nil)
+        }
 
         if let bundleId = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleId)
@@ -431,6 +520,7 @@ func toggleSelectAllSafe() {
                 self.totalDisk = space.total
                 self.availableDisk = space.available
                 self.isScanning = false
+                self.lastScanDate = Date()
                 let totalFound = self.visibleTargets.reduce(0) { $0 + $1.sizeBytes }
                 self.statusMessage = "Scan complete. Found \(formatBytes(totalFound)) in System Data, \(self.visibleLargeFiles.count) large files, and \(scannedApps.count) apps."
             }
@@ -526,6 +616,7 @@ func toggleSelectAllSafe() {
         statusMessage = "Cleaning selected items..."
         Task.detached(priority: .userInitiated) {
             let result = FileScanner.cleanTargetContents(urls: urls)
+            HistoryManager.shared.add(title: "Cleaned selected System Data", bytes: result.freed, items: result.moved)
             let freedText = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
             await MainActor.run {
                 if result.errors.isEmpty {
@@ -542,18 +633,30 @@ func toggleSelectAllSafe() {
         let urls = visibleLargeFiles.filter { $0.isSelected }.map { $0.url }
         guard !urls.isEmpty else { return }
 
-        let result = FileScanner.moveToTrash(urls: urls)
-        statusMessage = "Moved \(formatBytes(result.freed)) of large files to Trash."
-        runFullScan()
+        statusMessage = "Moving large files to Trash..."
+        Task.detached(priority: .userInitiated) {
+            let result = FileScanner.moveToTrash(urls: urls)
+            HistoryManager.shared.add(title: "Trashed \(result.moved.count) large file(s)", bytes: result.freed, items: result.moved)
+            await MainActor.run {
+                self.statusMessage = "Moved \(formatBytes(result.freed)) of large files to Trash."
+                self.runFullScan()
+            }
+        }
     }
 
     func cleanSelectedOrphans() {
         let urls = visibleOrphans.filter { $0.isSelected }.map { $0.url }
         guard !urls.isEmpty else { return }
 
-        let result = FileScanner.moveToTrash(urls: urls)
-        statusMessage = "Moved \(formatBytes(result.freed)) of orphaned leftovers to Trash."
-        runFullScan()
+        statusMessage = "Moving orphaned leftovers to Trash..."
+        Task.detached(priority: .userInitiated) {
+            let result = FileScanner.moveToTrash(urls: urls)
+            HistoryManager.shared.add(title: "Trashed orphaned leftovers", bytes: result.freed, items: result.moved)
+            await MainActor.run {
+                self.statusMessage = "Moved \(formatBytes(result.freed)) of orphaned leftovers to Trash."
+                self.runFullScan()
+            }
+        }
     }
 
     func uninstallApp(_ app: InstalledApp) {
@@ -582,6 +685,7 @@ func toggleSelectAllSafe() {
 
             let (totalFreed, allErrors) = await Task.detached(priority: .userInitiated) { () -> (Int64, [String]) in
                 let userResult = FileScanner.moveToTrash(urls: userURLs)
+                HistoryManager.shared.add(title: "Uninstalled \(app.name)", bytes: userResult.freed, items: userResult.moved)
                 var freed = userResult.freed
                 var errors = userResult.errors
                 if !systemURLs.isEmpty {
@@ -657,7 +761,7 @@ struct DiskUsageBar: View {
 
 struct ContentView: View {
     @ObservedObject var vm: SweeperViewModel
-    @State private var selectedTab: SidebarTab = .systemData
+    @State private var selectedTab: SidebarTab = .overview
     @State private var showCleanConfirm = false
     @State private var showDockerConfirm = false
     @State private var showEmptyTrashConfirm = false
@@ -807,6 +911,15 @@ struct ContentView: View {
                     SpaceLensView()
                 case .processes:
                     ProcessMonitorView()
+                case .overview:
+                    OverviewView(
+                        vm: vm,
+                        onSmartClean: { showCleanAllSafeConfirm = true },
+                        onEmptyTrash: { showEmptyTrashConfirm = true },
+                        onOpenTab: { selectedTab = $0 }
+                    )
+                case .history:
+                    HistoryView(vm: vm)
                 }
                 Divider()
                 footerBar
@@ -816,13 +929,13 @@ struct ContentView: View {
             vm.refreshPermissionsAndTrash()
         }
         .onChange(of: vm.isDockerInstalled) { installed in
-            if !installed && selectedTab == .docker { selectedTab = .systemData }
+            if !installed && selectedTab == .docker { selectedTab = .overview }
         }
         .onChange(of: vm.isBrewInstalled) { installed in
-            if !installed && selectedTab == .homebrew { selectedTab = .systemData }
+            if !installed && selectedTab == .homebrew { selectedTab = .overview }
         }
         .onChange(of: showAdvancedTools) { enabled in
-            if !enabled && selectedTab.isAdvanced { selectedTab = .systemData }
+            if !enabled && selectedTab.isAdvanced { selectedTab = .overview }
         }
         .frame(minWidth: 900, minHeight: 600)
         .onAppear {
@@ -887,7 +1000,7 @@ struct ContentView: View {
                 vm.cleanAllSafeTargets()
             }
         } message: {
-            Text("Moves the contents of every item marked Safe (\(formatBytes(vm.visibleTargets.filter { $0.safety == .safe }.reduce(0) { $0 + $1.sizeBytes }))) to your Trash. You can restore anything from the Trash until you empty it.")
+            Text("Moves the contents of every item marked Safe (\(formatBytes(vm.safeReclaimableBytes))) to your Trash. You can restore anything from the Trash until you empty it.")
         }
         .alert("Move Selected Items to Trash?", isPresented: $showCleanConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -933,7 +1046,7 @@ struct ContentView: View {
                 vm.emptyTrash()
             }
         } message: {
-            Text("This permanently deletes \(formatBytes(vm.trashSizeBytes)) from your Trash and frees up disk space immediately.")
+            Text("This permanently deletes \(formatBytes(vm.trashSizeBytes)) from your Trash and frees up disk space immediately. Past cleanups can no longer be undone from Cleaning History.")
         }
         .alert("Prune Unused Docker Data?", isPresented: $showDockerConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -989,6 +1102,7 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                 }
 
+                if selectedTab == .systemData {
                     Button {
                         showCleanAllSafeConfirm = true
                     } label: {
@@ -996,6 +1110,8 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .disabled(vm.safeReclaimableBytes == 0)
+                }
 
                     Button {
                     vm.runFullScan()
@@ -1360,6 +1476,13 @@ struct ContentView: View {
                 .padding(8)
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(8)
+                .padding([.horizontal, .top], 8)
+
+                Picker("Sort", selection: $vm.appSort) {
+                    ForEach(AppSort.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
                 .padding(8)
 
                 List(vm.filteredApps, selection: $vm.selectedAppId) { app in
@@ -1367,9 +1490,21 @@ struct ContentView: View {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: app.appURL.path))
                             .resizable()
                             .frame(width: 28, height: 28)
-                        VStack(alignment: .leading) {
-                            Text(app.name).font(.headline)
-                            Text("\(app.relatedFiles.count) leftover items")
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(app.name).font(.headline)
+                                if app.isUnused {
+                                    Text("Unused")
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(Color.purple.opacity(0.18))
+                                        .foregroundColor(.purple)
+                                        .cornerRadius(4)
+                                        .help("Not opened in over 6 months")
+                                }
+                            }
+                            Text(vm.appSort == .unused ? app.lastUsedText : "\(app.relatedFiles.count) leftover items")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -1393,6 +1528,9 @@ struct ContentView: View {
                             Text(app.bundleId.isEmpty ? "No Bundle ID" : app.bundleId)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                            Text(app.lastUsedText)
+                                .font(.caption)
+                                .foregroundColor(app.isUnused ? .purple : .secondary)
                         }
                         Spacer()
                         Button("Uninstall (\(formatBytes(app.selectedTotalSize)))") {

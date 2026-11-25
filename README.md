@@ -58,9 +58,12 @@ MacSweeper will automatically download, verify the download's checksum, install 
 
 | Feature | How It Helps |
 | :--- | :--- |
+| **📊 Overview & Smart Clean** | One screen shows how much you can safely free, where the rest of your space went, and a single **Smart Clean** button. |
+| **↩️ Cleaning History & Undo** | Every cleanup is logged. Click **Undo** to put files back exactly where they were, until you empty the Trash. |
 | **🧹 System Data Cleaner** | Finds hidden caches, old logs, and temporary files with green **Safe** badges—plus tips to shrink Time Machine snapshots and large hidden folders. |
 | **📦 Large & Old Files** | Scans your **Downloads**, **Desktop**, and **Documents** for huge files, forgotten `.dmg` installers, and old `.zip` archives. |
-| **🗑️ Complete App Uninstaller** | Removes the app *and* all its hidden leftover files in `Library` together, with a live search bar. |
+| **🗑️ Complete App Uninstaller** | Removes the app *and* all its hidden leftover files in `Library` together, with a live search bar. Sort by **Least Used** to spot apps you haven't opened in 6+ months. |
+| **🛠️ Developer Caches** | Xcode DerivedData, Archives & Device Support, plus npm, Yarn, pnpm, pip, Conda, Gradle, CocoaPods, Cargo, and Go caches. |
 | **⚡ SmartDelete** | Quietly watches your Trash—when you drag an app to the Trash in Finder, MacSweeper offers to clean up its leftover files automatically. |
 | **🚀 Startup Items Manager** | Lists background apps that launch when you turn on your Mac so you can remove ones slowing you down. |
 | **🌐 Browser Cleaner** | Clears Chrome, Safari, Arc, Brave, Firefox, and Edge caches without touching passwords, bookmarks, or logins. |

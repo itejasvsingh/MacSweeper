@@ -6,6 +6,16 @@ struct TabHelpInfo {
 
     static func info(for tabTitle: String) -> TabHelpInfo {
         switch tabTitle {
+        case "Overview":
+            return TabHelpInfo(
+                title: "What is Overview?",
+                message: "A one-screen summary of your disk: how much you can safely free, where the rest of your space is, and your recent cleanups. Smart Clean moves every item marked Safe to the Trash in one click."
+            )
+        case "Cleaning History":
+            return TabHelpInfo(
+                title: "What is Cleaning History?",
+                message: "Every cleanup MacSweeper does is logged here. Click Undo to put files back exactly where they were, as long as you haven't emptied the Trash yet."
+            )
         case "System Data":
             return TabHelpInfo(
                 title: "What is System Data?",
