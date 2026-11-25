@@ -7,6 +7,10 @@ struct DockerStatus {
 }
 
 final class DockerCleaner {
+    static var isInstalled: Bool {
+        FileManager.default.fileExists(atPath: "/Applications/Docker.app") || dockerBinaryPath() != nil
+    }
+
     static func dockerBinaryPath() -> String? {
         let candidates = [
             "/usr/local/bin/docker",
@@ -39,7 +43,7 @@ final class DockerCleaner {
     }
 
     static func checkStatus() -> DockerStatus {
-        guard dockerBinaryPath() != nil else {
+        guard isInstalled else {
             return DockerStatus(installed: false, running: false, output: "Docker Desktop is not installed.")
         }
         let res = runDocker(args: ["system", "df"])

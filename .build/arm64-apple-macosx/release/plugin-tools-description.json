@@ -48,6 +48,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift"
         },
         {
@@ -73,6 +77,7 @@
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swift.o",
+        "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker.swift.o"
       ],
@@ -151,6 +156,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o"
         },
         {
@@ -170,6 +179,7 @@
         "/Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift",
         "/Users/tejasv/MacSweeper/Sources/Models.swift",
         "/Users/tejasv/MacSweeper/Sources/Scanner.swift",
+        "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift",
         "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift",
         "/Users/tejasv/MacSweeper/Sources/UpdateChecker.swift"
       ],
@@ -194,6 +204,7 @@
       "/Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift",
       "/Users/tejasv/MacSweeper/Sources/Models.swift",
       "/Users/tejasv/MacSweeper/Sources/Scanner.swift",
+      "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift",
       "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift",
       "/Users/tejasv/MacSweeper/Sources/UpdateChecker.swift",
       "-I",
@@ -297,6 +308,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift"
         },
         {
@@ -336,6 +351,10 @@
         {
           "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o"
         },
         {
           "kind" : "file",

@@ -40,6 +40,12 @@
     "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swiftdeps",
     "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.dia"
   },
+  "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.dia"
+  },
   "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift": {
     "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o",
     "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller~partial.swiftmodule",

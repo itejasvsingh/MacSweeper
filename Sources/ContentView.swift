@@ -23,10 +23,14 @@ final class SweeperViewModel: ObservableObject {
     @Published var targets: [CleanupTarget] = []
     @Published var apps: [InstalledApp] = []
     @Published var orphans: [OrphanFolder] = []
-    @Published var dockerStatus = DockerStatus(installed: true, running: false, output: "Click 'Refresh Docker' to inspect Docker storage.")
+    @Published var topSystemHogs: [LargeSystemFolder] = []
+    @Published var localSnapshotCount: Int = 0
+    @Published var isDockerInstalled: Bool = DockerCleaner.isInstalled
+    @Published var dockerStatus = DockerStatus(installed: DockerCleaner.isInstalled, running: false, output: "Click 'Refresh Docker' to inspect Docker storage.")
     @Published var dockerLog = ""
     @Published var isScanning = false
     @Published var isPruningDocker = false
+    @Published var isThinningSnapshots = false
     @Published var isCheckingUpdates = false
     @Published var statusMessage = "Click Scan Mac to inspect System Data, apps, and leftovers."
     @Published var availableDisk: Int64 = 0
@@ -40,6 +44,13 @@ final class SweeperViewModel: ObservableObject {
     @Published var updateDownloadURL: URL?
     @Published var updateIsZip = false
     @Published var isInstallingUpdate = false
+
+    var visibleTabs: [SidebarTab] {
+        SidebarTab.allCases.filter { tab in
+            if tab == .docker { return isDockerInstalled }
+            return true
+        }
+    }
 
     init() {
         refreshDiskSpace()
@@ -128,19 +139,27 @@ final class SweeperViewModel: ObservableObject {
 
     func runFullScan() {
         isScanning = true
-        statusMessage = "Scanning Library folders, Docker, and Applications..."
+        statusMessage = "Scanning System Data, Library folders, snapshots, and Applications..."
 
         Task.detached(priority: .userInitiated) {
             let scannedTargets = FileScanner.scanTargets()
             let scannedApps = AppUninstaller.scanInstalledApps()
             let scannedOrphans = AppUninstaller.scanOrphans(installedApps: scannedApps)
-            let docker = DockerCleaner.checkStatus()
+            let hogs = SystemDataAdvisor.scanTopSystemHogs()
+            let snapshots = SystemDataAdvisor.countLocalSnapshots()
+            let dockerInstalled = DockerCleaner.isInstalled
+            let docker = dockerInstalled
+                ? DockerCleaner.checkStatus()
+                : DockerStatus(installed: false, running: false, output: "Docker Desktop is not installed.")
             let space = FileScanner.diskSpace()
 
             await MainActor.run {
                 self.targets = scannedTargets
                 self.apps = scannedApps
                 self.orphans = scannedOrphans
+                self.topSystemHogs = hogs
+                self.localSnapshotCount = snapshots
+                self.isDockerInstalled = dockerInstalled
                 self.dockerStatus = docker
                 self.totalDisk = space.total
                 self.availableDisk = space.available
@@ -151,11 +170,29 @@ final class SweeperViewModel: ObservableObject {
         }
     }
 
+    func thinSnapshots() {
+        isThinningSnapshots = true
+        statusMessage = "Thinning local Time Machine snapshots..."
+        Task.detached(priority: .userInitiated) {
+            let msg = SystemDataAdvisor.thinLocalSnapshots()
+            let snapshots = SystemDataAdvisor.countLocalSnapshots()
+            let space = FileScanner.diskSpace()
+            await MainActor.run {
+                self.localSnapshotCount = snapshots
+                self.availableDisk = space.available
+                self.isThinningSnapshots = false
+                self.statusMessage = msg
+            }
+        }
+    }
+
     func refreshDocker() {
         Task.detached(priority: .userInitiated) {
+            let installed = DockerCleaner.isInstalled
             let status = DockerCleaner.checkStatus()
             let space = FileScanner.diskSpace()
             await MainActor.run {
+                self.isDockerInstalled = installed
                 self.dockerStatus = status
                 self.availableDisk = space.available
             }
@@ -323,7 +360,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(SidebarTab.allCases, selection: $selectedTab) { tab in
+                List(vm.visibleTabs, selection: $selectedTab) { tab in
                     Label(tab.rawValue, systemImage: tab.icon)
                         .tag(tab)
                 }
@@ -373,6 +410,11 @@ struct ContentView: View {
                 }
                 Divider()
                 footerBar
+            }
+        }
+        .onChange(of: vm.isDockerInstalled) { installed in
+            if !installed && selectedTab == .docker {
+                selectedTab = .systemData
             }
         }
         .frame(minWidth: 880, minHeight: 580)
@@ -461,51 +503,116 @@ struct ContentView: View {
 
     private var systemDataView: some View {
         List {
-            if vm.targets.isEmpty {
-                Text("No scan results yet. Click 'Scan Mac' to inspect your System Data.")
+            if vm.targets.isEmpty && vm.topSystemHogs.isEmpty {
+                Text("No scan results yet. Click 'Scan Mac' to inspect your System Data and get reduction tips.")
                     .foregroundColor(.secondary)
                     .padding(.vertical, 24)
             } else {
-                ForEach(vm.targets) { target in
-                    HStack(alignment: .top, spacing: 12) {
-                        Toggle("", isOn: Binding(
-                            get: { target.isSelected },
-                            set: { _ in vm.toggleTarget(target.id) }
-                        ))
-                        .labelsHidden()
+                Section("Quick Cleanup Targets") {
+                    ForEach(vm.targets) { target in
+                        HStack(alignment: .top, spacing: 12) {
+                            Toggle("", isOn: Binding(
+                                get: { target.isSelected },
+                                set: { _ in vm.toggleTarget(target.id) }
+                            ))
+                            .labelsHidden()
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(target.name).font(.headline)
-                                Text(target.safety.rawValue)
-                                    .font(.caption2.bold())
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(target.safety.color.opacity(0.18))
-                                    .foregroundColor(target.safety.color)
-                                    .cornerRadius(4)
-                                Text(target.category.rawValue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(target.name).font(.headline)
+                                    Text(target.safety.rawValue)
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(target.safety.color.opacity(0.18))
+                                        .foregroundColor(target.safety.color)
+                                        .cornerRadius(4)
+                                    Text(target.category.rawValue)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Text(target.explanation)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            Text(target.explanation)
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(formatBytes(target.sizeBytes))
+                                    .font(.system(.body, design: .monospaced).bold())
+                                Button("Reveal") {
+                                    if let first = target.paths.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+                                        NSWorkspace.shared.activateFileViewerSelecting([first])
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.caption)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                Section("How to Decrease System Data") {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Time Machine Local Snapshots: \(vm.localSnapshotCount)")
+                                .font(.headline)
+                            Text(vm.localSnapshotCount > 0
+                                 ? "Local APFS snapshots count toward System Data. Thinning them safely frees hidden space."
+                                 : "No local Time Machine snapshots detected.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text(formatBytes(target.sizeBytes))
-                                .font(.system(.body, design: .monospaced).bold())
-                            Button("Reveal") {
-                                if let first = target.paths.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
-                                    NSWorkspace.shared.activateFileViewerSelecting([first])
-                                }
+                        if vm.localSnapshotCount > 0 {
+                            Button(vm.isThinningSnapshots ? "Thinning..." : "Thin Snapshots") {
+                                vm.thinSnapshots()
                             }
-                            .buttonStyle(.link)
-                            .font(.caption)
+                            .buttonStyle(.bordered)
+                            .disabled(vm.isThinningSnapshots)
                         }
                     }
                     .padding(.vertical, 4)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Other Ways to Shrink System Data")
+                            .font(.headline)
+                        Text("• Empty your macOS Trash after cleaning — moved files still occupy space until Trash is emptied.\n• Restart your Mac occasionally to clear macOS swap and temporary system caches.\n• Review the largest hidden ~/Library folders below and delete leftovers from apps you no longer use.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                if !vm.topSystemHogs.isEmpty {
+                    Section("Largest Hidden ~/Library Folders (>200 MB)") {
+                        ForEach(vm.topSystemHogs) { hog in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text(hog.name).font(.headline)
+                                        Text(hog.location)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Text(hog.advice)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text(formatBytes(hog.sizeBytes))
+                                        .font(.system(.body, design: .monospaced).bold())
+                                    Button("Reveal") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([hog.url])
+                                    }
+                                    .buttonStyle(.link)
+                                    .font(.caption)
+                                }
+                            }
+                            .padding(.vertical, 3)
+                        }
+                    }
                 }
             }
         }
