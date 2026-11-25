@@ -679,22 +679,17 @@ func toggleSelectAllSafe() {
         let urls = selected.map { $0.url }
         guard !urls.isEmpty else { return }
 
-        // Optimistically remove the selected orphans from the list immediately
-        // so the UI reflects the deletion without waiting for a full rescan.
-        // (~/Library/Containers entries are symlinks — the system may recreate
-        // them before the rescan completes, causing deleted items to reappear.)
-        let removedPaths = Set(urls.map { $0.path })
-        orphans.removeAll { removedPaths.contains($0.url.path) }
-
         statusMessage = "Moving orphaned leftovers to Trash..."
         Task.detached(priority: .userInitiated) {
             let result = FileScanner.moveToTrash(urls: urls)
             HistoryManager.shared.add(title: "Trashed orphaned leftovers", bytes: result.freed, items: result.moved)
             await MainActor.run {
+                let movedPaths = Set(result.moved.map { $0.original })
+                self.orphans.removeAll { movedPaths.contains($0.url.path) }
                 if result.errors.isEmpty {
                     self.statusMessage = "Moved \(formatBytes(result.freed)) of orphaned leftovers to Trash."
                 } else {
-                    self.statusMessage = "Moved \(formatBytes(result.freed)) (\(result.errors.joined(separator: "; ")))."
+                    self.statusMessage = "Moved \(formatBytes(result.freed)); \(result.errors.count) failed: \(result.errors[0])"
                 }
                 self.runFullScan()
             }

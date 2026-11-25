@@ -281,9 +281,43 @@ final class FileScanner {
                 if let item = try fm.trashItemRecording(at: url) { moved.append(item) }
                 freed += size
             } catch {
-                errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                // macOS refuses direct moves of ~/Library/Containers/<id> ("Operation
+                // not permitted") even with Full Disk Access; Finder is allowed to.
+                if let item = trashViaFinder(url) {
+                    moved.append(item)
+                    freed += size
+                } else {
+                    errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                }
             }
         }
         return (freed, errors, moved)
+    }
+
+    /// Asks Finder to trash `url` (needs the one-time Automation permission for Finder).
+    static func trashViaFinder(_ url: URL) -> TrashedItem? {
+        let path = url.path
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        tell application "Finder"
+            set t to delete (POSIX file "\(path)" as alias)
+            return POSIX path of (t as alias)
+        end tell
+        """
+        let process = Process()
+        let out = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        process.standardOutput = out
+        process.standardError = Pipe()
+        do { try process.run() } catch { return nil }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        let dest = (String(data: data, encoding: .utf8) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !dest.isEmpty else { return nil }
+        return TrashedItem(original: url.path, trashed: dest)
     }
 }

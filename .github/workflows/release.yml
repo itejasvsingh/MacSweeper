@@ -101,6 +101,7 @@ jobs:
               <key>CFBundlePackageType</key><string>APPL</string>
               <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
               <key>LSMinimumSystemVersion</key><string>13.0</string>
+              <key>NSAppleEventsUsageDescription</key><string>MacSweeper asks Finder to move protected app leftovers to the Trash.</string>
           </dict>
           </plist>
           PLIST
