@@ -3,7 +3,10 @@ import AppKit
 
 enum SidebarTab: String, CaseIterable, Identifiable {
     case systemData = "System Data"
+    case largeFiles = "Large & Old Files"
     case docker = "Docker"
+    case homebrew = "Homebrew"
+    case startup = "Startup Items"
     case uninstaller = "App Uninstaller"
     case orphans = "Orphaned Leftovers"
 
@@ -11,7 +14,10 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .systemData: return "internaldrive"
+        case .largeFiles: return "doc.text.magnifyingglass"
         case .docker: return "shippingbox"
+        case .homebrew: return "mug"
+        case .startup: return "bolt.circle"
         case .uninstaller: return "trash"
         case .orphans: return "folder.badge.questionmark"
         }
@@ -21,22 +27,34 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 @MainActor
 final class SweeperViewModel: ObservableObject {
     @Published var targets: [CleanupTarget] = []
+    @Published var largeFiles: [LargeFileItem] = []
+    @Published var startupItems: [StartupItem] = []
+    @Published var brewPackages: [BrewPackage] = []
+    @Published var brewLog: String = ""
+    @Published var isRunningBrew: Bool = false
     @Published var apps: [InstalledApp] = []
     @Published var orphans: [OrphanFolder] = []
     @Published var topSystemHogs: [LargeSystemFolder] = []
     @Published var localSnapshotCount: Int = 0
     @Published var isDockerInstalled: Bool = DockerCleaner.isInstalled
+    @Published var isBrewInstalled: Bool = HomebrewManager.isInstalled
+    @Published var hasFullDiskAccess: Bool = SystemDataAdvisor.hasFullDiskAccess()
+    @Published var trashSizeBytes: Int64 = 0
+    @Published var appSearchText: String = ""
+    @Published var ignoredKeys: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "ignoredKeys") ?? [])
     @Published var dockerStatus = DockerStatus(installed: DockerCleaner.isInstalled, running: false, output: "Click 'Refresh Docker' to inspect Docker storage.")
     @Published var dockerLog = ""
     @Published var isScanning = false
     @Published var isPruningDocker = false
     @Published var isThinningSnapshots = false
     @Published var isCheckingUpdates = false
-    @Published var statusMessage = "Click Scan Mac to inspect System Data, apps, and leftovers."
+    @Published var statusMessage = "Click Scan Mac to inspect System Data, large files, startup items, and apps."
     @Published var availableDisk: Int64 = 0
     @Published var totalDisk: Int64 = 0
     @Published var selectedAppId: UUID?
     @Published var launchAtLogin: Bool = LoginItemManager.isEnabled
+    @Published var smartDeleteEnabled: Bool = UserDefaults.standard.object(forKey: "smartDeleteEnabled") as? Bool ?? true
+    @Published var smartDeletePrompt: SmartDeletePrompt?
 
     @Published var showUpdateAlert = false
     @Published var updateAlertTitle = ""
@@ -45,16 +63,172 @@ final class SweeperViewModel: ObservableObject {
     @Published var updateIsZip = false
     @Published var isInstallingUpdate = false
 
+    private var trashWatcher: TrashWatcher?
+
     var visibleTabs: [SidebarTab] {
         SidebarTab.allCases.filter { tab in
             if tab == .docker { return isDockerInstalled }
+            if tab == .homebrew { return isBrewInstalled }
             return true
         }
     }
 
+    var visibleTargets: [CleanupTarget] {
+        targets.filter { !ignoredKeys.contains("target:\($0.name)") }
+    }
+
+    var visibleLargeFiles: [LargeFileItem] {
+        largeFiles.filter { !ignoredKeys.contains("file:\($0.url.path)") }
+    }
+
+    var visibleOrphans: [OrphanFolder] {
+        orphans.filter { !ignoredKeys.contains("orphan:\($0.url.path)") }
+    }
+
+    var filteredApps: [InstalledApp] {
+        let query = appSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return apps }
+        return apps.filter {
+            $0.name.lowercased().contains(query) || $0.bundleId.lowercased().contains(query)
+        }
+    }
+
+    var allSafeSelected: Bool {
+        let safeTargets = visibleTargets.filter { $0.safety == .safe }
+        return !safeTargets.isEmpty && safeTargets.allSatisfy { $0.isSelected }
+    }
+
     init() {
         refreshDiskSpace()
+        refreshPermissionsAndTrash()
         checkForUpdates(silentIfUpToDate: true)
+        setupTrashWatcher()
+    }
+
+    func ignoreItem(key: String, label: String) {
+        ignoredKeys.insert(key)
+        UserDefaults.standard.set(Array(ignoredKeys), forKey: "ignoredKeys")
+        statusMessage = "Hidden '\(label)' from future scans."
+    }
+
+    func resetIgnoredItems() {
+        ignoredKeys.removeAll()
+        UserDefaults.standard.removeObject(forKey: "ignoredKeys")
+        statusMessage = "Cleared all ignored items."
+    }
+
+    private func setupTrashWatcher() {
+        trashWatcher = TrashWatcher { [weak self] prompt in
+            Task { @MainActor in
+                guard let self = self, self.smartDeleteEnabled else { return }
+                self.smartDeletePrompt = prompt
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
+        if smartDeleteEnabled {
+            trashWatcher?.start()
+        }
+    }
+
+    func setSmartDeleteEnabled(_ enabled: Bool) {
+        smartDeleteEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "smartDeleteEnabled")
+        if enabled {
+            trashWatcher?.start()
+            statusMessage = "SmartDelete enabled — watching Trash for uninstalled apps."
+        } else {
+            trashWatcher?.stop()
+            statusMessage = "SmartDelete paused."
+        }
+    }
+
+    func cleanSmartDeleteLeftovers(_ prompt: SmartDeletePrompt) {
+        let userURLs = prompt.relatedFiles.filter { !$0.isSystemWide }.map { $0.url }
+        let systemURLs = prompt.relatedFiles.filter { $0.isSystemWide }.map { $0.url }
+
+        let userResult = FileScanner.moveToTrash(urls: userURLs)
+        var totalFreed = userResult.freed
+        if !systemURLs.isEmpty {
+            let sysResult = AppUninstaller.removeSystemWideItems(urls: systemURLs)
+            totalFreed += sysResult.freed
+        }
+        statusMessage = "SmartDelete cleaned \(formatBytes(totalFreed)) of leftovers for \(prompt.appName)."
+        refreshPermissionsAndTrash()
+    }
+
+    func refreshPermissionsAndTrash() {
+        hasFullDiskAccess = SystemDataAdvisor.hasFullDiskAccess()
+        Task.detached(priority: .utility) {
+            let trash = SystemDataAdvisor.trashSize()
+            await MainActor.run {
+                self.trashSizeBytes = trash
+            }
+        }
+    }
+
+    func toggleSelectAllSafe() {
+        let shouldSelect = !allSafeSelected
+        for idx in targets.indices where targets[idx].safety == .safe && !ignoredKeys.contains("target:\(targets[idx].name)") {
+            targets[idx].isSelected = shouldSelect
+        }
+    }
+
+    func emptyTrash() {
+        statusMessage = "Emptying Trash..."
+        Task.detached(priority: .userInitiated) {
+            let result = SystemDataAdvisor.emptyTrash()
+            let trash = SystemDataAdvisor.trashSize()
+            let space = FileScanner.diskSpace()
+            await MainActor.run {
+                self.trashSizeBytes = trash
+                self.availableDisk = space.available
+                self.totalDisk = space.total
+                if result.errors.isEmpty {
+                    self.statusMessage = "Emptied Trash — reclaimed \(formatBytes(result.freed))."
+                } else {
+                    self.statusMessage = "Emptied Trash (\(formatBytes(result.freed))) with warnings: \(result.errors.joined(separator: "; "))"
+                }
+            }
+        }
+    }
+
+    func runBrewCleanup() {
+        isRunningBrew = true
+        statusMessage = "Running brew cleanup -s..."
+        Task.detached(priority: .userInitiated) {
+            let log = HomebrewManager.cleanup()
+            let space = FileScanner.diskSpace()
+            await MainActor.run {
+                self.brewLog = log
+                self.availableDisk = space.available
+                self.isRunningBrew = false
+                self.statusMessage = "Homebrew cleanup finished."
+            }
+        }
+    }
+
+    func uninstallBrewPackage(_ pkg: BrewPackage) {
+        isRunningBrew = true
+        statusMessage = "Uninstalling \(pkg.name) via Homebrew..."
+        Task.detached(priority: .userInitiated) {
+            let log = HomebrewManager.uninstall(pkg)
+            let updated = HomebrewManager.listPackages()
+            let space = FileScanner.diskSpace()
+            await MainActor.run {
+                self.brewLog = log
+                self.brewPackages = updated
+                self.availableDisk = space.available
+                self.isRunningBrew = false
+                self.statusMessage = log
+            }
+        }
+    }
+
+    func removeStartupItem(_ item: StartupItem) {
+        let msg = StartupManager.removeItem(item)
+        statusMessage = msg
+        startupItems = StartupManager.scan()
+        refreshPermissionsAndTrash()
     }
 
     func checkForUpdates(silentIfUpToDate: Bool = false) {
@@ -128,7 +302,7 @@ final class SweeperViewModel: ObservableObject {
     }
 
     var totalReclaimableBytes: Int64 {
-        targets.reduce(0) { $0 + $1.sizeBytes }
+        visibleTargets.reduce(0) { $0 + $1.sizeBytes }
     }
 
     func refreshDiskSpace() {
@@ -139,14 +313,20 @@ final class SweeperViewModel: ObservableObject {
 
     func runFullScan() {
         isScanning = true
-        statusMessage = "Scanning System Data, Library folders, snapshots, and Applications..."
+        statusMessage = "Scanning System Data, large files, startup items, Homebrew, and Applications..."
 
         Task.detached(priority: .userInitiated) {
             let scannedTargets = FileScanner.scanTargets()
+            let scannedLarge = LargeFilesScanner.scan()
+            let scannedStartup = StartupManager.scan()
+            let brewInstalled = HomebrewManager.isInstalled
+            let scannedBrew = brewInstalled ? HomebrewManager.listPackages() : []
             let scannedApps = AppUninstaller.scanInstalledApps()
             let scannedOrphans = AppUninstaller.scanOrphans(installedApps: scannedApps)
             let hogs = SystemDataAdvisor.scanTopSystemHogs()
             let snapshots = SystemDataAdvisor.countLocalSnapshots()
+            let fda = SystemDataAdvisor.hasFullDiskAccess()
+            let trash = SystemDataAdvisor.trashSize()
             let dockerInstalled = DockerCleaner.isInstalled
             let docker = dockerInstalled
                 ? DockerCleaner.checkStatus()
@@ -155,17 +335,23 @@ final class SweeperViewModel: ObservableObject {
 
             await MainActor.run {
                 self.targets = scannedTargets
+                self.largeFiles = scannedLarge
+                self.startupItems = scannedStartup
+                self.isBrewInstalled = brewInstalled
+                self.brewPackages = scannedBrew
                 self.apps = scannedApps
                 self.orphans = scannedOrphans
                 self.topSystemHogs = hogs
                 self.localSnapshotCount = snapshots
+                self.hasFullDiskAccess = fda
+                self.trashSizeBytes = trash
                 self.isDockerInstalled = dockerInstalled
                 self.dockerStatus = docker
                 self.totalDisk = space.total
                 self.availableDisk = space.available
                 self.isScanning = false
-                let totalFound = scannedTargets.reduce(0) { $0 + $1.sizeBytes }
-                self.statusMessage = "Scan complete. Found \(formatBytes(totalFound)) across \(scannedTargets.count) System Data targets and \(scannedApps.count) apps."
+                let totalFound = self.visibleTargets.reduce(0) { $0 + $1.sizeBytes }
+                self.statusMessage = "Scan complete. Found \(formatBytes(totalFound)) in System Data, \(self.visibleLargeFiles.count) large files, and \(scannedApps.count) apps."
             }
         }
     }
@@ -222,6 +408,12 @@ final class SweeperViewModel: ObservableObject {
         }
     }
 
+    func toggleLargeFile(_ id: UUID) {
+        if let idx = largeFiles.firstIndex(where: { $0.id == id }) {
+            largeFiles[idx].isSelected.toggle()
+        }
+    }
+
     func toggleOrphan(_ id: UUID) {
         if let idx = orphans.firstIndex(where: { $0.id == id }) {
             orphans[idx].isSelected.toggle()
@@ -235,28 +427,41 @@ final class SweeperViewModel: ObservableObject {
     }
 
     var selectedTargetBytes: Int64 {
-        targets.filter { $0.isSelected }.reduce(0) { $0 + $1.sizeBytes }
+        visibleTargets.filter { $0.isSelected }.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var selectedLargeFileBytes: Int64 {
+        visibleLargeFiles.filter { $0.isSelected }.reduce(0) { $0 + $1.sizeBytes }
     }
 
     var selectedOrphanBytes: Int64 {
-        orphans.filter { $0.isSelected }.reduce(0) { $0 + $1.size }
+        visibleOrphans.filter { $0.isSelected }.reduce(0) { $0 + $1.size }
     }
 
     func cleanSelectedTargets() {
-        let urls = targets.filter { $0.isSelected }.flatMap { $0.paths }
+        let urls = visibleTargets.filter { $0.isSelected }.flatMap { $0.paths }
         guard !urls.isEmpty else { return }
 
         let result = FileScanner.moveToTrash(urls: urls)
         if result.errors.isEmpty {
-            statusMessage = "Moved \(formatBytes(result.freed)) to Trash. Empty Trash to reclaim disk space."
+            statusMessage = "Moved \(formatBytes(result.freed)) to Trash. Click Empty Trash to reclaim disk space."
         } else {
             statusMessage = "Moved \(formatBytes(result.freed)) to Trash with warnings: \(result.errors.joined(separator: "; "))"
         }
         runFullScan()
     }
 
+    func cleanSelectedLargeFiles() {
+        let urls = visibleLargeFiles.filter { $0.isSelected }.map { $0.url }
+        guard !urls.isEmpty else { return }
+
+        let result = FileScanner.moveToTrash(urls: urls)
+        statusMessage = "Moved \(formatBytes(result.freed)) of large files to Trash."
+        runFullScan()
+    }
+
     func cleanSelectedOrphans() {
-        let urls = orphans.filter { $0.isSelected }.map { $0.url }
+        let urls = visibleOrphans.filter { $0.isSelected }.map { $0.url }
         guard !urls.isEmpty else { return }
 
         let result = FileScanner.moveToTrash(urls: urls)
@@ -355,7 +560,16 @@ struct ContentView: View {
     @State private var selectedTab: SidebarTab = .systemData
     @State private var showCleanConfirm = false
     @State private var showDockerConfirm = false
+    @State private var showEmptyTrashConfirm = false
     @State private var appToUninstall: InstalledApp?
+    @State private var startupToRemove: StartupItem?
+
+    private static let dateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        df.timeStyle = .none
+        return df
+    }()
 
     var body: some View {
         NavigationSplitView {
@@ -382,6 +596,22 @@ struct ContentView: View {
                     .controlSize(.small)
                     .disabled(vm.isCheckingUpdates)
 
+                    if !vm.ignoredKeys.isEmpty {
+                        Button("Reset Ignored (\(vm.ignoredKeys.count))") {
+                            vm.resetIgnoredItems()
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
+
+                    Toggle("SmartDelete", isOn: Binding(
+                        get: { vm.smartDeleteEnabled },
+                        set: { vm.setSmartDeleteEnabled($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.caption)
+
                     Toggle("Launch at Login", isOn: Binding(
                         get: { vm.launchAtLogin },
                         set: { vm.setLaunchAtLogin($0) }
@@ -401,8 +631,14 @@ struct ContentView: View {
                 switch selectedTab {
                 case .systemData:
                     systemDataView
+                case .largeFiles:
+                    largeFilesView
                 case .docker:
                     dockerView
+                case .homebrew:
+                    homebrewView
+                case .startup:
+                    startupView
                 case .uninstaller:
                     uninstallerView
                 case .orphans:
@@ -412,12 +648,16 @@ struct ContentView: View {
                 footerBar
             }
         }
-        .onChange(of: vm.isDockerInstalled) { installed in
-            if !installed && selectedTab == .docker {
-                selectedTab = .systemData
-            }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            vm.refreshPermissionsAndTrash()
         }
-        .frame(minWidth: 880, minHeight: 580)
+        .onChange(of: vm.isDockerInstalled) { installed in
+            if !installed && selectedTab == .docker { selectedTab = .systemData }
+        }
+        .onChange(of: vm.isBrewInstalled) { installed in
+            if !installed && selectedTab == .homebrew { selectedTab = .systemData }
+        }
+        .frame(minWidth: 900, minHeight: 600)
         .alert(vm.updateAlertTitle, isPresented: $vm.showUpdateAlert) {
             if vm.updateDownloadURL != nil {
                 Button(vm.updateIsZip ? "Install & Relaunch" : "Download Update") {
@@ -430,17 +670,47 @@ struct ContentView: View {
         } message: {
             Text(vm.updateAlertMessage)
         }
+        .alert(item: $vm.smartDeletePrompt) { prompt in
+            Alert(
+                title: Text("SmartDelete: \(prompt.appName) Trashed"),
+                message: Text("Found \(prompt.relatedFiles.count) leftover files (\(formatBytes(prompt.totalSize))) in Library. Move them to Trash too?"),
+                primaryButton: .destructive(Text("Clean Leftovers")) {
+                    vm.cleanSmartDeleteLeftovers(prompt)
+                },
+                secondaryButton: .cancel(Text("Ignore"))
+            )
+        }
+        .alert(item: $startupToRemove) { item in
+            Alert(
+                title: Text("Remove Startup Item?"),
+                message: Text("Move \(item.name).plist (\(item.scope)) to Trash? It will no longer launch automatically at login.\(item.isSystem ? " macOS will ask for your password." : "")"),
+                primaryButton: .destructive(Text("Move to Trash")) {
+                    vm.removeStartupItem(item)
+                },
+                secondaryButton: .cancel()
+            )
+        }
         .alert("Move Selected Items to Trash?", isPresented: $showCleanConfirm) {
             Button("Cancel", role: .cancel) {}
             Button("Move to Trash", role: .destructive) {
                 if selectedTab == .systemData {
                     vm.cleanSelectedTargets()
+                } else if selectedTab == .largeFiles {
+                    vm.cleanSelectedLargeFiles()
                 } else if selectedTab == .orphans {
                     vm.cleanSelectedOrphans()
                 }
             }
         } message: {
             Text("Files will be moved to your macOS Trash so you can recover them if needed.")
+        }
+        .alert("Empty Trash Permanently?", isPresented: $showEmptyTrashConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty Trash", role: .destructive) {
+                vm.emptyTrash()
+            }
+        } message: {
+            Text("This permanently deletes \(formatBytes(vm.trashSizeBytes)) from your Trash and frees up disk space immediately.")
         }
         .alert("Prune Unused Docker Data?", isPresented: $showDockerConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -471,12 +741,20 @@ struct ContentView: View {
                 Text(selectedTab.rawValue)
                     .font(.title2.bold())
                 Spacer()
-                Button("Full Disk Access") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-                        NSWorkspace.shared.open(url)
+                if selectedTab == .systemData && !vm.visibleTargets.isEmpty {
+                    Button(vm.allSafeSelected ? "Deselect Safe" : "Select All Safe") {
+                        vm.toggleSelectAllSafe()
                     }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
+                if !vm.hasFullDiskAccess {
+                    Button("Full Disk Access") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 Button {
                     vm.runFullScan()
@@ -503,13 +781,13 @@ struct ContentView: View {
 
     private var systemDataView: some View {
         List {
-            if vm.targets.isEmpty && vm.topSystemHogs.isEmpty {
+            if vm.visibleTargets.isEmpty && vm.topSystemHogs.isEmpty {
                 Text("No scan results yet. Click 'Scan Mac' to inspect your System Data and get reduction tips.")
                     .foregroundColor(.secondary)
                     .padding(.vertical, 24)
             } else {
-                Section("Quick Cleanup Targets") {
-                    ForEach(vm.targets) { target in
+                Section("Quick Cleanup Targets (Right-click to ignore)") {
+                    ForEach(vm.visibleTargets) { target in
                         HStack(alignment: .top, spacing: 12) {
                             Toggle("", isOn: Binding(
                                 get: { target.isSelected },
@@ -549,6 +827,11 @@ struct ContentView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        .contextMenu {
+                            Button("Ignore in Future Scans") {
+                                vm.ignoreItem(key: "target:\(target.name)", label: target.name)
+                            }
+                        }
                     }
                 }
 
@@ -618,6 +901,149 @@ struct ContentView: View {
         }
     }
 
+    private var largeFilesView: some View {
+        List {
+            if vm.visibleLargeFiles.isEmpty {
+                Text("No large files or installers found yet. Click 'Scan Mac' to scan Downloads, Desktop, and Documents.")
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 24)
+            } else {
+                ForEach(vm.visibleLargeFiles) { item in
+                    HStack(alignment: .center, spacing: 12) {
+                        Toggle("", isOn: Binding(
+                            get: { item.isSelected },
+                            set: { _ in vm.toggleLargeFile(item.id) }
+                        ))
+                        .labelsHidden()
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(item.name).font(.headline)
+                                Text(item.tag)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(item.tag == "Installer" ? Color.orange.opacity(0.2) : Color.blue.opacity(0.18))
+                                    .foregroundColor(item.tag == "Installer" ? .orange : .blue)
+                                    .cornerRadius(4)
+                            }
+                            Text("\(item.location) • Modified \(Self.dateFormatter.string(from: item.modifiedDate))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text(formatBytes(item.sizeBytes))
+                            .font(.system(.body, design: .monospaced).bold())
+                        Button("Reveal") {
+                            NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
+                    .padding(.vertical, 3)
+                    .contextMenu {
+                        Button("Ignore in Future Scans") {
+                            vm.ignoreItem(key: "file:\(item.url.path)", label: item.name)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var homebrewView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("\(vm.brewPackages.count) Installed Packages")
+                    .font(.headline)
+                Spacer()
+                Button(vm.isRunningBrew ? "Running..." : "Run brew cleanup") {
+                    vm.runBrewCleanup()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.isRunningBrew)
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+
+            if !vm.brewLog.isEmpty {
+                GroupBox("Homebrew Output") {
+                    ScrollView {
+                        Text(vm.brewLog)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(6)
+                    }
+                    .frame(height: 80)
+                }
+                .padding(.horizontal)
+            }
+
+            List(vm.brewPackages) { pkg in
+                HStack {
+                    Text(pkg.name).font(.headline)
+                    Text(pkg.isCask ? "Cask" : "Formula")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(pkg.isCask ? Color.purple.opacity(0.18) : Color.blue.opacity(0.18))
+                        .foregroundColor(pkg.isCask ? .purple : .blue)
+                        .cornerRadius(4)
+                    Spacer()
+                    Button("Uninstall") {
+                        vm.uninstallBrewPackage(pkg)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(vm.isRunningBrew)
+                }
+            }
+        }
+    }
+
+    private var startupView: some View {
+        List {
+            if vm.startupItems.isEmpty {
+                Text("No third-party background LaunchAgents or LaunchDaemons found. Click 'Scan Mac' to check.")
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 24)
+            } else {
+                ForEach(vm.startupItems) { item in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(item.name).font(.headline)
+                                Text(item.scope)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(item.isSystem ? Color.orange.opacity(0.2) : Color.blue.opacity(0.18))
+                                    .foregroundColor(item.isSystem ? .orange : .blue)
+                                    .cornerRadius(4)
+                            }
+                            Text(item.url.path)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button("Reveal") {
+                            NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+
+                        Button("Remove") {
+                            startupToRemove = item
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
+    }
+
     private var dockerView: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -674,22 +1100,44 @@ struct ContentView: View {
 
     private var uninstallerView: some View {
         HSplitView {
-            List(vm.apps, selection: $vm.selectedAppId) { app in
-                HStack(spacing: 10) {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: app.appURL.path))
-                        .resizable()
-                        .frame(width: 28, height: 28)
-                    VStack(alignment: .leading) {
-                        Text(app.name).font(.headline)
-                        Text("\(app.relatedFiles.count) leftover items")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Search apps...", text: $vm.appSearchText)
+                        .textFieldStyle(.plain)
+                    if !vm.appSearchText.isEmpty {
+                        Button {
+                            vm.appSearchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    Spacer()
-                    Text(formatBytes(app.totalSize))
-                        .font(.system(.caption, design: .monospaced).bold())
                 }
-                .tag(app.id)
+                .padding(8)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(8)
+                .padding(8)
+
+                List(vm.filteredApps, selection: $vm.selectedAppId) { app in
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: app.appURL.path))
+                            .resizable()
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading) {
+                            Text(app.name).font(.headline)
+                            Text("\(app.relatedFiles.count) leftover items")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text(formatBytes(app.totalSize))
+                            .font(.system(.caption, design: .monospaced).bold())
+                    }
+                    .tag(app.id)
+                }
             }
             .frame(minWidth: 280)
 
@@ -768,12 +1216,12 @@ struct ContentView: View {
 
     private var orphansView: some View {
         List {
-            if vm.orphans.isEmpty {
+            if vm.visibleOrphans.isEmpty {
                 Text("No large orphaned Containers (>10 MB) found. Click 'Scan Mac' to check.")
                     .foregroundColor(.secondary)
                     .padding(.vertical, 24)
             } else {
-                ForEach(vm.orphans) { orphan in
+                ForEach(vm.visibleOrphans) { orphan in
                     HStack {
                         Toggle("", isOn: Binding(
                             get: { orphan.isSelected },
@@ -797,6 +1245,11 @@ struct ContentView: View {
                         .font(.caption)
                     }
                     .padding(.vertical, 4)
+                    .contextMenu {
+                        Button("Ignore in Future Scans") {
+                            vm.ignoreItem(key: "orphan:\(orphan.url.path)", label: orphan.name)
+                        }
+                    }
                 }
             }
         }
@@ -809,8 +1262,20 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
             Spacer()
+            if vm.trashSizeBytes > 0 {
+                Button("Empty Trash (\(formatBytes(vm.trashSizeBytes)))") {
+                    showEmptyTrashConfirm = true
+                }
+                .buttonStyle(.bordered)
+            }
             if selectedTab == .systemData && vm.selectedTargetBytes > 0 {
                 Button("Move Selected to Trash (\(formatBytes(vm.selectedTargetBytes)))") {
+                    showCleanConfirm = true
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+            } else if selectedTab == .largeFiles && vm.selectedLargeFileBytes > 0 {
+                Button("Move Files to Trash (\(formatBytes(vm.selectedLargeFileBytes)))") {
                     showCleanConfirm = true
                 }
                 .buttonStyle(.borderedProminent)

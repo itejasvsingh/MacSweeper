@@ -16,6 +16,18 @@
     "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.swiftdeps",
     "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.dia"
   },
+  "/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.dia"
+  },
   "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift": {
     "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swift.o",
     "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager~partial.swiftmodule",
@@ -40,11 +52,23 @@
     "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swiftdeps",
     "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.dia"
   },
+  "/Users/tejasv/MacSweeper/Sources/StartupManager.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.dia"
+  },
   "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift": {
     "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o",
     "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor~partial.swiftmodule",
     "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swiftdeps",
     "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.dia"
+  },
+  "/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift": {
+    "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.swift.o",
+    "swiftmodule": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher~partial.swiftmodule",
+    "swift-dependencies": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.swiftdeps",
+    "diagnostics": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.dia"
   },
   "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift": {
     "object": "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o",

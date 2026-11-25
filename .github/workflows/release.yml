@@ -3,6 +3,9 @@ name: Build and Release MacSweeper
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'install.sh'
   workflow_dispatch:
 
 permissions:
@@ -17,12 +20,12 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set version
-        run: echo "APP_VERSION=1.5.${{ github.run_number }}" >> $GITHUB_ENV
+        run: echo "APP_VERSION=1.6.${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Build release binary
         run: swift build -c release
 
-      - name: Generate App Icon
+      - name: Generate App Icon from Assets/logo.png
         run: |
           cat << 'SWIFT' > /tmp/make_icon.swift
           import AppKit
@@ -30,6 +33,10 @@ jobs:
           let iconset = "/tmp/MacSweeper.iconset"
           try? FileManager.default.removeItem(atPath: iconset)
           try! FileManager.default.createDirectory(atPath: iconset, withIntermediateDirectories: true)
+
+          guard let src = NSImage(contentsOfFile: "Assets/logo.png") else {
+              fatalError("Assets/logo.png not found")
+          }
 
           let sizes: [(String, Int)] = [
               ("icon_16x16.png", 16), ("icon_16x16@2x.png", 32),
@@ -45,24 +52,24 @@ jobs:
               img.lockFocus()
               let rect = NSRect(x: size * 0.08, y: size * 0.08, width: size * 0.84, height: size * 0.84)
               let path = NSBezierPath(roundedRect: rect, xRadius: size * 0.2, yRadius: size * 0.2)
-              let grad = NSGradient(starting: NSColor(red: 0.14, green: 0.45, blue: 0.96, alpha: 1.0),
-                                    ending: NSColor(red: 0.35, green: 0.18, blue: 0.88, alpha: 1.0))!
-              grad.draw(in: path, angle: -45)
-              if let sym = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil) {
-                  let cfg = NSImage.SymbolConfiguration(pointSize: size * 0.42, weight: .bold)
-                  let tinted = sym.withSymbolConfiguration(cfg)!
-                  let rep = NSImage(size: tinted.size)
-                  rep.lockFocus()
-                  NSColor.white.set()
-                  let symRect = NSRect(origin: .zero, size: tinted.size)
-                  tinted.draw(in: symRect)
-                  symRect.fill(using: .sourceAtop)
-                  rep.unlockFocus()
-                  let x = (size - rep.size.width) / 2
-                  let y = (size - rep.size.height) / 2
-                  rep.draw(in: NSRect(x: x, y: y, width: rep.size.width, height: rep.size.height))
+              NSColor.white.setFill()
+              path.fill()
+              path.addClip()
+
+              let pad = size * 0.14
+              let availW = size - pad * 2
+              let availH = size - pad * 2
+              let aspect = src.size.width / max(1, src.size.height)
+              var drawW = availW
+              var drawH = availW / aspect
+              if drawH > availH {
+                  drawH = availH
+                  drawW = availH * aspect
               }
+              let drawRect = NSRect(x: (size - drawW) / 2, y: (size - drawH) / 2, width: drawW, height: drawH)
+              src.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0)
               img.unlockFocus()
+
               if let tiff = img.tiffRepresentation,
                  let bitmap = NSBitmapImageRep(data: tiff),
                  let png = bitmap.representation(using: .png, properties: [:]) {

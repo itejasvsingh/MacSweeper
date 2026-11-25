@@ -32,6 +32,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift"
         },
         {
@@ -48,7 +56,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/StartupManager.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift"
         },
         {
           "kind" : "file",
@@ -73,11 +89,15 @@
       "objects" : [
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/ContentView.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/DockerCleaner.swift.o",
+        "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.swift.o",
+        "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/MacSweeperApp.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Models.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Scanner.swift.o",
+        "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o",
+        "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/Uninstaller.swift.o",
         "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/UpdateChecker.swift.o"
       ],
@@ -140,6 +160,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swift.o"
         },
         {
@@ -156,7 +184,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.swift.o"
         },
         {
           "kind" : "file",
@@ -175,11 +211,15 @@
       "sources" : [
         "/Users/tejasv/MacSweeper/Sources/ContentView.swift",
         "/Users/tejasv/MacSweeper/Sources/DockerCleaner.swift",
+        "/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift",
+        "/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift",
         "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift",
         "/Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift",
         "/Users/tejasv/MacSweeper/Sources/Models.swift",
         "/Users/tejasv/MacSweeper/Sources/Scanner.swift",
+        "/Users/tejasv/MacSweeper/Sources/StartupManager.swift",
         "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift",
+        "/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift",
         "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift",
         "/Users/tejasv/MacSweeper/Sources/UpdateChecker.swift"
       ],
@@ -200,11 +240,15 @@
       "-c",
       "/Users/tejasv/MacSweeper/Sources/ContentView.swift",
       "/Users/tejasv/MacSweeper/Sources/DockerCleaner.swift",
+      "/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift",
+      "/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift",
       "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift",
       "/Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift",
       "/Users/tejasv/MacSweeper/Sources/Models.swift",
       "/Users/tejasv/MacSweeper/Sources/Scanner.swift",
+      "/Users/tejasv/MacSweeper/Sources/StartupManager.swift",
       "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift",
+      "/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift",
       "/Users/tejasv/MacSweeper/Sources/Uninstaller.swift",
       "/Users/tejasv/MacSweeper/Sources/UpdateChecker.swift",
       "-I",
@@ -292,6 +336,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/LoginItemManager.swift"
         },
         {
@@ -308,7 +360,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/StartupManager.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift"
         },
         {
           "kind" : "file",
@@ -338,6 +398,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/HomebrewManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LargeFilesScanner.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/LoginItemManager.swift.o"
         },
         {
@@ -354,7 +422,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/StartupManager.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/SystemDataAdvisor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/tejasv/MacSweeper/.build/arm64-apple-macosx/release/MacSweeper.build/TrashWatcher.swift.o"
         },
         {
           "kind" : "file",

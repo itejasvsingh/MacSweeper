@@ -1,9 +1,13 @@
 /Users/tejasv/MacSweeper/Sources/ContentView.swift
 /Users/tejasv/MacSweeper/Sources/DockerCleaner.swift
+/Users/tejasv/MacSweeper/Sources/HomebrewManager.swift
+/Users/tejasv/MacSweeper/Sources/LargeFilesScanner.swift
 /Users/tejasv/MacSweeper/Sources/LoginItemManager.swift
 /Users/tejasv/MacSweeper/Sources/MacSweeperApp.swift
 /Users/tejasv/MacSweeper/Sources/Models.swift
 /Users/tejasv/MacSweeper/Sources/Scanner.swift
+/Users/tejasv/MacSweeper/Sources/StartupManager.swift
 /Users/tejasv/MacSweeper/Sources/SystemDataAdvisor.swift
+/Users/tejasv/MacSweeper/Sources/TrashWatcher.swift
 /Users/tejasv/MacSweeper/Sources/Uninstaller.swift
 /Users/tejasv/MacSweeper/Sources/UpdateChecker.swift

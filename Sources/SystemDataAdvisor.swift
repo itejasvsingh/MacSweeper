@@ -12,6 +12,39 @@ struct LargeSystemFolder: Identifiable {
 final class SystemDataAdvisor {
     static let fm = FileManager.default
 
+    static func hasFullDiskAccess() -> Bool {
+        let protectedPaths = [
+            "/Library/Application Support/com.apple.TCC/TCC.db",
+            fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/Bookmarks.plist").path
+        ]
+        return protectedPaths.contains { fm.isReadableFile(atPath: $0) }
+    }
+
+    static func trashSize() -> Int64 {
+        let trashURL = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash")
+        guard fm.fileExists(atPath: trashURL.path) else { return 0 }
+        return FileScanner.directorySize(at: trashURL)
+    }
+
+    static func emptyTrash() -> (freed: Int64, errors: [String]) {
+        let trashURL = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash")
+        guard let items = try? fm.contentsOfDirectory(at: trashURL, includingPropertiesForKeys: nil) else {
+            return (0, [])
+        }
+        var freed: Int64 = 0
+        var errors: [String] = []
+        for item in items {
+            let size = FileScanner.directorySize(at: item)
+            do {
+                try fm.removeItem(at: item)
+                freed += size
+            } catch {
+                errors.append("\(item.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        return (freed, errors)
+    }
+
     static func scanTopSystemHogs() -> [LargeSystemFolder] {
         let lib = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library")
         let dirs: [(String, URL, String)] = [
