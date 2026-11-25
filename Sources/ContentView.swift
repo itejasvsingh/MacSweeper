@@ -661,6 +661,14 @@ struct ContentView: View {
                     .controlSize(.small)
                     .font(.caption)
 
+                    Toggle("Weekly Reminder", isOn: Binding(
+                        get: { ReminderManager.isEnabled },
+                        set: { ReminderManager.setEnabled($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.caption)
+
                     Toggle("Launch at Login", isOn: Binding(
                         get: { vm.launchAtLogin },
                         set: { vm.setLaunchAtLogin($0) }
@@ -724,6 +732,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 600)
         .onAppear {
+            MenuBarManager.shared.setup()
             if !hasSeenWelcomeGuide {
                 showWelcomeGuide = true
             }

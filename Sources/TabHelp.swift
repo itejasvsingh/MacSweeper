@@ -36,6 +36,26 @@ struct TabHelpInfo {
                 title: "What is App Uninstaller?",
                 message: "Dragging an app to the Trash normally leaves behind hidden support files and caches in your Library folder. This tab removes the app AND all its hidden leftovers together."
             )
+        case "Duplicates":
+            return TabHelpInfo(
+                title: "What is Duplicate Finder?",
+                message: "Compares file sizes and SHA-256 hashes across Downloads, Desktop, and Documents to find exact duplicate files over 1 MB so you can safely trash extra copies."
+            )
+        case "RAM & CPU":
+            return TabHelpInfo(
+                title: "What is RAM & CPU?",
+                message: "Shows the top apps and background processes using your Mac's memory or processor right now, with one-click Quit and Force Quit buttons."
+            )
+        case "Space Lens":
+            return TabHelpInfo(
+                title: "What is Space Lens?",
+                message: "Visualizes your largest folders with proportional bars so you can click into folders and quickly spot where gigabytes are hiding."
+            )
+        case "Browser Cleaner":
+            return TabHelpInfo(
+                title: "What is Browser Cleaner?",
+                message: "Clears heavy temporary caches from Chrome, Safari, Arc, Brave, Firefox, and Edge without deleting your saved passwords, bookmarks, or logins."
+            )
         case "Orphaned Leftovers":
             return TabHelpInfo(
                 title: "What are Orphaned Leftovers?",
