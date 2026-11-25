@@ -563,6 +563,8 @@ struct ContentView: View {
     @State private var showEmptyTrashConfirm = false
     @State private var appToUninstall: InstalledApp?
     @State private var startupToRemove: StartupItem?
+    @AppStorage("hasSeenWelcomeGuide") private var hasSeenWelcomeGuide = false
+    @State private var showWelcomeGuide = false
 
     private static let dateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -583,6 +585,18 @@ struct ContentView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        showWelcomeGuide = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "questionmark.circle")
+                            Text("Feature Guide")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
                     Button {
                         vm.checkForUpdates()
                     } label: {
@@ -658,6 +672,16 @@ struct ContentView: View {
             if !installed && selectedTab == .homebrew { selectedTab = .systemData }
         }
         .frame(minWidth: 900, minHeight: 600)
+        .onAppear {
+            if !hasSeenWelcomeGuide {
+                showWelcomeGuide = true
+            }
+        }
+        .sheet(isPresented: $showWelcomeGuide) {
+            WelcomeGuideView(isPresented: $showWelcomeGuide) {
+                hasSeenWelcomeGuide = true
+            }
+        }
         .alert(vm.updateAlertTitle, isPresented: $vm.showUpdateAlert) {
             if vm.updateDownloadURL != nil {
                 Button(vm.updateIsZip ? "Install & Relaunch" : "Download Update") {
