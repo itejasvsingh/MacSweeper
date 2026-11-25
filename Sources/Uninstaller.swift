@@ -147,6 +147,7 @@ final class AppUninstaller {
         let installedBundles = Set(installedApps.map { $0.bundleId.lowercased() }.filter { !$0.isEmpty })
         let installedNames = Set(installedApps.map { $0.name.lowercased() })
         let containersDir = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Containers")
+        let trashDir = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash").path
 
         guard let items = try? fm.contentsOfDirectory(at: containersDir, includingPropertiesForKeys: nil) else {
             return []
@@ -159,6 +160,13 @@ final class AppUninstaller {
             let folderName = item.lastPathComponent
             let lower = folderName.lowercased()
             if lower.hasPrefix("com.apple.") || lower.hasPrefix("group.com.apple.") { continue }
+
+            // ~/Library/Containers uses symlinks; resolve the real path and skip
+            // anything that has already been moved to the Trash (the symlink is
+            // gone or its target now lives inside ~/.Trash).
+            let resolved = item.resolvingSymlinksInPath()
+            if !fm.fileExists(atPath: item.path) { continue }
+            if resolved.path.hasPrefix(trashDir) { continue }
 
             let isInstalled = installedBundles.contains(where: { lower.contains($0) || $0.contains(lower) })
                 || installedNames.contains(where: { $0.count >= 4 && lower.contains($0) })
