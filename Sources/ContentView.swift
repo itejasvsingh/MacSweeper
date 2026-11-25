@@ -976,7 +976,7 @@ struct ContentView: View {
         }
         .alert(vm.updateAlertTitle, isPresented: $vm.showUpdateAlert) {
             if vm.updateDownloadURL != nil {
-                Button(vm.updateIsZip ? "Install & Relaunch" : "Download Update") {
+                Button(vm.updateIsZip ? "Install & Relaunch" : "Update") {
                     vm.installPendingUpdate()
                 }
                 Button("Later", role: .cancel) {}
