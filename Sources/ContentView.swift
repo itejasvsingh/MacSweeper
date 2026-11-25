@@ -603,6 +603,8 @@ struct ContentView: View {
     @State private var startupToRemove: StartupItem?
     @AppStorage("hasSeenWelcomeGuide") private var hasSeenWelcomeGuide = false
     @State private var showWelcomeGuide = false
+    @AppStorage("showAdvancedTools") private var showAdvancedTools = false
+    @State private var showSettingsSheet = false
     @AppStorage("seenTabHelpKeys") private var seenTabHelpKeys = ""
     @State private var activeTabHelp: TabHelpInfo?
     @State private var showSelfUninstallConfirm = false
@@ -626,6 +628,18 @@ struct ContentView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        showSettingsSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "gearshape")
+                            Text("Settings")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
                     Button {
                         showWelcomeGuide = true
                     } label: {
@@ -742,6 +756,20 @@ struct ContentView: View {
             if !hasSeenWelcomeGuide {
                 showWelcomeGuide = true
             }
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            SettingsSheetView(
+                isPresented: $showSettingsSheet,
+                showAdvancedTools: $showAdvancedTools,
+                smartDeleteEnabled: .constant(true),
+                weeklyReminderEnabled: .constant(ReminderManager.isEnabled),
+                launchAtLogin: .constant(vm.launchAtLogin),
+                onToggleSmartDelete: { _ in },
+                onToggleReminder: { ReminderManager.setEnabled($0) },
+                onToggleLogin: { vm.setLaunchAtLogin($0) },
+                onCheckUpdates: { vm.checkForUpdates() },
+                onUninstall: { showSelfUninstallConfirm = true }
+            )
         }
         .sheet(isPresented: $showWelcomeGuide) {
             WelcomeGuideView(isPresented: $showWelcomeGuide) {
