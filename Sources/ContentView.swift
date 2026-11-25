@@ -297,6 +297,38 @@ final class SweeperViewModel: ObservableObject {
         statusMessage = launchAtLogin ? "MacSweeper will now launch automatically at login." : "Launch at Login disabled."
     }
 
+    func selfUninstall() {
+        LoginItemManager.setEnabled(false)
+        trashWatcher?.stop()
+
+        if let bundleId = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleId)
+            UserDefaults.standard.synchronize()
+        }
+
+        let appURL = Bundle.main.bundleURL
+        let appPath = appURL.path
+        let prefPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Preferences/com.local.macsweeper.plist").path
+
+        let script: String
+        if appPath.hasSuffix(".app") {
+            let escapedApp = appPath.replacingOccurrences(of: "'", with: "'\\''")
+            let escapedPref = prefPath.replacingOccurrences(of: "'", with: "'\\''")
+            script = "sleep 1; rm -f '\(escapedPref)'; osascript -e 'tell application \"Finder\" to delete POSIX file \"\(escapedApp)\"' >/dev/null 2>&1 || mv '\(escapedApp)' \"$HOME/.Trash/MacSweeper-\$(date +%s).app\""
+        } else {
+            let escapedPref = prefPath.replacingOccurrences(of: "'", with: "'\\''")
+            script = "sleep 1; rm -f '\(escapedPref)'"
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script]
+        try? process.run()
+
+        NSApp.terminate(nil)
+    }
+
     var usedDisk: Int64 {
         max(0, totalDisk - availableDisk)
     }
@@ -565,6 +597,7 @@ struct ContentView: View {
     @State private var startupToRemove: StartupItem?
     @AppStorage("hasSeenWelcomeGuide") private var hasSeenWelcomeGuide = false
     @State private var showWelcomeGuide = false
+    @State private var showSelfUninstallConfirm = false
 
     private static let dateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -632,6 +665,22 @@ struct ContentView: View {
                     ))
                     .toggleStyle(.switch)
                     .controlSize(.small)
+                    .font(.caption)
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    Button(role: .destructive) {
+                        showSelfUninstallConfirm = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("Uninstall MacSweeper")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.red)
                     .font(.caption)
                 }
                 .padding(.horizontal, 14)
@@ -727,6 +776,14 @@ struct ContentView: View {
             }
         } message: {
             Text("Files will be moved to your macOS Trash so you can recover them if needed.")
+        }
+        .alert("Uninstall MacSweeper?", isPresented: $showSelfUninstallConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Uninstall & Quit", role: .destructive) {
+                vm.selfUninstall()
+            }
+        } message: {
+            Text("This disables Launch at Login, clears MacSweeper's preferences, quits the app, and moves MacSweeper.app to your Trash.")
         }
         .alert("Empty Trash Permanently?", isPresented: $showEmptyTrashConfirm) {
             Button("Cancel", role: .cancel) {}
