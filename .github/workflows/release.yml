@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-build
+  cancel-in-progress: true
+
 jobs:
   build-and-release:
     runs-on: macos-latest
