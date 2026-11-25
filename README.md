@@ -25,9 +25,10 @@
 ### Option 1: Fastest Way (Recommended — No Mac Popups)
 You don't need any tech experience—just copy and paste one line:
 
-1. Press **Command (⌘) + Space** on your keyboard to open Spotlight Search.
-2. Type **Terminal** and press **Return**.
-3. Copy the line below, paste it into the Terminal window, and press **Return**:
+1. Open **Finder** (the smiling face icon in your Dock).
+2. Click **Go** in the top menu bar → **Utilities** *(or press **Shift + ⌘ + U**)*.
+3. Double-click **Terminal** (the black icon).
+4. Copy the line below, paste it into the Terminal window, and press **Return**:
 
 ```bash
 curl -fsSL [https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh](https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh) | bash
@@ -44,7 +45,7 @@ MacSweeper will automatically download, install into your **Applications** folde
 
 > **Seeing a *"MacSweeper is damaged"* message?**  
 > Don't worry—the app is not actually damaged. Because MacSweeper is a free, independent app (not sold on the Mac App Store), macOS blocks browser downloads by default.  
-> To allow it once, open **Terminal** (**⌘ + Space** → type **Terminal** → press **Return**), paste this line, and press **Return**:
+> To allow it once, open **Terminal** (**Finder → Go → Utilities → Terminal**), paste this line, and press **Return**:
 > ```bash
 > xattr -cr /Applications/MacSweeper.app
 > ```
