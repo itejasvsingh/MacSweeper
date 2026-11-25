@@ -681,15 +681,13 @@ func toggleSelectAllSafe() {
 
         statusMessage = "Moving orphaned leftovers to Trash..."
         Task.detached(priority: .userInitiated) {
-            let result = FileScanner.moveToTrash(urls: urls)
+            let result = FileScanner.moveContainersToTrash(urls: urls)
             HistoryManager.shared.add(title: "Trashed orphaned leftovers", bytes: result.freed, items: result.moved)
             await MainActor.run {
-                let movedPaths = Set(result.moved.map { $0.original })
-                self.orphans.removeAll { movedPaths.contains($0.url.path) }
                 if result.errors.isEmpty {
                     self.statusMessage = "Moved \(formatBytes(result.freed)) of orphaned leftovers to Trash."
                 } else {
-                    self.statusMessage = "Moved \(formatBytes(result.freed)); \(result.errors.count) failed: \(result.errors[0])"
+                    self.statusMessage = "Moved \(formatBytes(result.freed)); \(result.errors.count) item(s) failed: \(result.errors[0])"
                 }
                 self.runFullScan()
             }
