@@ -9,12 +9,18 @@ final class ReminderManager {
         UserDefaults.standard.bool(forKey: key)
     }
 
-    static func setEnabled(_ enabled: Bool) {
+    /// `completion` reports whether notifications were allowed (always true when disabling).
+    static func setEnabled(_ enabled: Bool, completion: ((Bool) -> Void)? = nil) {
         UserDefaults.standard.set(enabled, forKey: key)
         let center = UNUserNotificationCenter.current()
         if enabled {
             center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-                guard granted else { return }
+                guard granted else {
+                    UserDefaults.standard.set(false, forKey: key)
+                    completion?(false)
+                    return
+                }
+                completion?(true)
                 let content = UNMutableNotificationContent()
                 content.title = "Weekly MacSweeper Checkup"
                 content.body = "Open MacSweeper to clear browser caches, duplicates, and system junk."
@@ -29,6 +35,7 @@ final class ReminderManager {
             }
         } else {
             center.removePendingNotificationRequests(withIdentifiers: [notifID])
+            completion?(true)
         }
     }
 }

@@ -12,6 +12,14 @@ struct ProcessMonitorView: View {
     @State private var processes: [RunningProcess] = []
     @State private var sortByMemory = true
     @State private var isLoading = false
+    @State private var pendingForceQuit: RunningProcess?
+    @State private var status = ""
+
+    /// Killing these logs you out, freezes the screen, or destabilizes macOS.
+    private static let criticalProcesses: Set<String> = [
+        "loginwindow", "WindowServer", "kernel_task", "launchd", "Finder", "Dock",
+        "SystemUIServer", "ControlCenter", "coreaudiod", "mds", "mds_stores", "cfprefsd"
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,6 +33,13 @@ struct ProcessMonitorView: View {
                 .onChange(of: sortByMemory) { _ in refresh() }
 
                 Spacer()
+
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
 
                 Button {
                     refresh()
@@ -54,22 +69,38 @@ struct ProcessMonitorView: View {
                         .foregroundColor(proc.memoryMB > 500 ? .red : .secondary)
                         .frame(width: 80, alignment: .trailing)
 
+                    let critical = Self.criticalProcesses.contains(proc.name)
                     Button("Quit") {
-                        terminate(pid: proc.id, force: false)
+                        terminate(proc, force: false)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(critical)
 
                     Button("Force", role: .destructive) {
-                        terminate(pid: proc.id, force: true)
+                        pendingForceQuit = proc
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(critical)
+                    .help(critical ? "macOS system process. Quitting it can log you out or freeze your Mac." : "Force quit (unsaved work will be lost)")
                 }
             }
         }
         .padding()
         .onAppear { refresh() }
+        .alert("Force Quit \(pendingForceQuit?.name ?? "")?", isPresented: Binding(
+            get: { pendingForceQuit != nil },
+            set: { if !$0 { pendingForceQuit = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { pendingForceQuit = nil }
+            Button("Force Quit", role: .destructive) {
+                if let proc = pendingForceQuit { terminate(proc, force: true) }
+                pendingForceQuit = nil
+            }
+        } message: {
+            Text("Any unsaved work in this app will be lost.")
+        }
     }
 
     private func refresh() {
@@ -107,8 +138,14 @@ struct ProcessMonitorView: View {
         }
     }
 
-    private func terminate(pid: Int32, force: Bool) {
-        kill(pid, force ? SIGKILL : SIGTERM)
+    private func terminate(_ proc: RunningProcess, force: Bool) {
+        if kill(proc.id, force ? SIGKILL : SIGTERM) == 0 {
+            status = force ? "Force quit \(proc.name)." : "Asked \(proc.name) to quit."
+        } else if errno == EPERM {
+            status = "\(proc.name) belongs to the system or another user and can't be quit from here."
+        } else {
+            status = "Couldn't quit \(proc.name) (it may have already exited)."
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             refresh()
         }

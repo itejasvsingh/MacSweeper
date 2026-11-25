@@ -9,6 +9,10 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     case startup = "Startup Items"
     case uninstaller = "App Uninstaller"
     case orphans = "Orphaned Leftovers"
+    case browser = "Browser Cleaner"
+    case duplicates = "Duplicates"
+    case spaceLens = "Space Lens"
+    case processes = "RAM & CPU"
 
     var id: String { rawValue }
     var icon: String {
@@ -20,7 +24,16 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .startup: return "bolt.circle"
         case .uninstaller: return "trash"
         case .orphans: return "folder.badge.questionmark"
+        case .browser: return "globe"
+        case .duplicates: return "doc.on.doc"
+        case .spaceLens: return "chart.bar.doc.horizontal"
+        case .processes: return "cpu"
         }
+    }
+
+    /// Only shown when "Show Advanced Tools" is on in Settings.
+    var isAdvanced: Bool {
+        self == .spaceLens || self == .processes
     }
 }
 
@@ -55,6 +68,7 @@ final class SweeperViewModel: ObservableObject {
     @Published var launchAtLogin: Bool = LoginItemManager.isEnabled
     @Published var smartDeleteEnabled: Bool = UserDefaults.standard.object(forKey: "smartDeleteEnabled") as? Bool ?? true
     @Published var smartDeletePrompt: SmartDeletePrompt?
+    @Published var weeklyReminderEnabled: Bool = ReminderManager.isEnabled
 
     @Published var showUpdateAlert = false
     @Published var updateAlertTitle = ""
@@ -127,6 +141,18 @@ final class SweeperViewModel: ObservableObject {
         }
         if smartDeleteEnabled {
             trashWatcher?.start()
+        }
+    }
+
+    func setWeeklyReminder(_ enabled: Bool) {
+        weeklyReminderEnabled = enabled
+        ReminderManager.setEnabled(enabled) { granted in
+            Task { @MainActor in
+                if !granted {
+                    self.weeklyReminderEnabled = false
+                    self.statusMessage = "Notifications are turned off for MacSweeper. Allow them in System Settings → Notifications to get the weekly reminder."
+                }
+            }
         }
     }
 
@@ -321,6 +347,7 @@ func toggleSelectAllSafe() {
 
     func selfUninstall() {
         LoginItemManager.setEnabled(false)
+        ReminderManager.setEnabled(false)
         trashWatcher?.stop()
 
         if let bundleId = Bundle.main.bundleIdentifier {
@@ -530,36 +557,49 @@ func toggleSelectAllSafe() {
     }
 
     func uninstallApp(_ app: InstalledApp) {
-        if app.isRunning {
-            for running in NSWorkspace.shared.runningApplications where running.bundleIdentifier == app.bundleId {
-                running.terminate()
+        statusMessage = "Uninstalling \(app.name)..."
+        let running = NSWorkspace.shared.runningApplications.filter {
+            !app.bundleId.isEmpty && $0.bundleIdentifier == app.bundleId
+        }
+        for app in running { _ = app.terminate() }
+
+        Task {
+            // Give the app a chance to quit (and save) before moving its files,
+            // otherwise it can recreate leftovers or be trashed while still open.
+            var waited = 0
+            while running.contains(where: { !$0.isTerminated }) && waited < 20 {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                waited += 1
             }
-        }
-
-        let selectedFiles = app.relatedFiles.filter { $0.isSelected }
-        var userURLs = [app.appURL]
-        userURLs.append(contentsOf: selectedFiles.filter { !$0.isSystemWide }.map { $0.url })
-        let systemURLs = selectedFiles.filter { $0.isSystemWide }.map { $0.url }
-
-        let userResult = FileScanner.moveToTrash(urls: userURLs)
-        var totalFreed = userResult.freed
-        var allErrors = userResult.errors
-
-        if !systemURLs.isEmpty {
-            let sysResult = AppUninstaller.removeSystemWideItems(urls: systemURLs)
-            totalFreed += sysResult.freed
-            if let err = sysResult.error {
-                allErrors.append(err)
+            if running.contains(where: { !$0.isTerminated }) {
+                statusMessage = "\(app.name) is still running (it may be waiting for you to save). Quit it, then try again."
+                return
             }
-        }
 
-        if allErrors.isEmpty {
-            statusMessage = "Uninstalled \(app.name) — moved \(formatBytes(totalFreed)) to Trash."
-        } else {
-            statusMessage = "Uninstalled \(app.name) (\(formatBytes(totalFreed))) with notes: \(allErrors.joined(separator: "; "))"
+            let selectedFiles = app.relatedFiles.filter { $0.isSelected }
+            let userURLs = [app.appURL] + selectedFiles.filter { !$0.isSystemWide }.map { $0.url }
+            let systemURLs = selectedFiles.filter { $0.isSystemWide }.map { $0.url }
+
+            let (totalFreed, allErrors) = await Task.detached(priority: .userInitiated) { () -> (Int64, [String]) in
+                let userResult = FileScanner.moveToTrash(urls: userURLs)
+                var freed = userResult.freed
+                var errors = userResult.errors
+                if !systemURLs.isEmpty {
+                    let sysResult = AppUninstaller.removeSystemWideItems(urls: systemURLs)
+                    freed += sysResult.freed
+                    if let err = sysResult.error { errors.append(err) }
+                }
+                return (freed, errors)
+            }.value
+
+            if allErrors.isEmpty {
+                statusMessage = "Uninstalled \(app.name) — moved \(formatBytes(totalFreed)) to Trash."
+            } else {
+                statusMessage = "Uninstalled \(app.name) (\(formatBytes(totalFreed))) with notes: \(allErrors.joined(separator: "; "))"
+            }
+            selectedAppId = nil
+            runFullScan()
         }
-        selectedAppId = nil
-        runFullScan()
     }
 }
 
@@ -630,6 +670,7 @@ struct ContentView: View {
     @AppStorage("seenTabHelpKeys") private var seenTabHelpKeys = ""
     @State private var activeTabHelp: TabHelpInfo?
     @State private var showSelfUninstallConfirm = false
+    @State private var showCleanAllSafeConfirm = false
 
     private static let dateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -641,7 +682,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(vm.visibleTabs, selection: $selectedTab) { tab in
+                List(vm.visibleTabs.filter { showAdvancedTools || !$0.isAdvanced }, selection: $selectedTab) { tab in
                     Label(tab.rawValue, systemImage: tab.icon)
                         .tag(tab)
                 }
@@ -704,8 +745,8 @@ struct ContentView: View {
                     .font(.caption)
 
                     Toggle("Weekly Reminder", isOn: Binding(
-                        get: { ReminderManager.isEnabled },
-                        set: { ReminderManager.setEnabled($0) }
+                        get: { vm.weeklyReminderEnabled },
+                        set: { vm.setWeeklyReminder($0) }
                     ))
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -758,6 +799,14 @@ struct ContentView: View {
                     uninstallerView
                 case .orphans:
                     orphansView
+                case .browser:
+                    BrowserCleanerView()
+                case .duplicates:
+                    DuplicatesView()
+                case .spaceLens:
+                    SpaceLensView()
+                case .processes:
+                    ProcessMonitorView()
                 }
                 Divider()
                 footerBar
@@ -772,9 +821,11 @@ struct ContentView: View {
         .onChange(of: vm.isBrewInstalled) { installed in
             if !installed && selectedTab == .homebrew { selectedTab = .systemData }
         }
+        .onChange(of: showAdvancedTools) { enabled in
+            if !enabled && selectedTab.isAdvanced { selectedTab = .systemData }
+        }
         .frame(minWidth: 900, minHeight: 600)
         .onAppear {
-            MenuBarManager.shared.setup()
             if !hasSeenWelcomeGuide {
                 showWelcomeGuide = true
             }
@@ -783,11 +834,11 @@ struct ContentView: View {
             SettingsSheetView(
                 isPresented: $showSettingsSheet,
                 showAdvancedTools: $showAdvancedTools,
-                smartDeleteEnabled: .constant(true),
-                weeklyReminderEnabled: .constant(ReminderManager.isEnabled),
-                launchAtLogin: .constant(vm.launchAtLogin),
-                onToggleSmartDelete: { _ in },
-                onToggleReminder: { ReminderManager.setEnabled($0) },
+                smartDeleteEnabled: $vm.smartDeleteEnabled,
+                weeklyReminderEnabled: $vm.weeklyReminderEnabled,
+                launchAtLogin: $vm.launchAtLogin,
+                onToggleSmartDelete: { vm.setSmartDeleteEnabled($0) },
+                onToggleReminder: { vm.setWeeklyReminder($0) },
                 onToggleLogin: { vm.setLaunchAtLogin($0) },
                 onCheckUpdates: { vm.checkForUpdates() },
                 onUninstall: { showSelfUninstallConfirm = true }
@@ -829,6 +880,14 @@ struct ContentView: View {
                 },
                 secondaryButton: .cancel()
             )
+        }
+        .alert("Clean All Safe Items?", isPresented: $showCleanAllSafeConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Move to Trash", role: .destructive) {
+                vm.cleanAllSafeTargets()
+            }
+        } message: {
+            Text("Moves the contents of every item marked Safe (\(formatBytes(vm.visibleTargets.filter { $0.safety == .safe }.reduce(0) { $0 + $1.sizeBytes }))) to your Trash. You can restore anything from the Trash until you empty it.")
         }
         .alert("Move Selected Items to Trash?", isPresented: $showCleanConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -931,7 +990,7 @@ struct ContentView: View {
                 }
 
                     Button {
-                        vm.cleanAllSafeTargets()
+                        showCleanAllSafeConfirm = true
                     } label: {
                         Label("Clean All Safe", systemImage: "sparkles")
                     }

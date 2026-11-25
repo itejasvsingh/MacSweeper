@@ -24,7 +24,7 @@ struct SettingsSheetView: View {
 
             Divider()
 
-            Toggle("Show Advanced Tools (Homebrew, Docker, Startup, RAM/CPU, Space Lens)", isOn: $showAdvancedTools)
+            Toggle("Show Advanced Tools (RAM & CPU monitor, Space Lens)", isOn: $showAdvancedTools)
             Toggle("SmartDelete (Offer to clean app leftovers when trashing an app)", isOn: Binding(
                 get: { smartDeleteEnabled },
                 set: { val in

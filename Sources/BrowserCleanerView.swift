@@ -91,18 +91,32 @@ struct BrowserCleanerView: View {
     }
 
     private func cleanSelected() {
-        let fm = FileManager.default
-        var freed: Int64 = 0
-        for item in items where item.isSelected {
-            if let children = try? fm.contentsOfDirectory(at: item.path, includingPropertiesForKeys: nil) {
+        let selected = items.filter { $0.isSelected }.map { $0.path }
+        status = "Moving browser caches to Trash..."
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fm = FileManager.default
+            var freed: Int64 = 0
+            var skipped = 0
+            for dir in selected {
+                let children = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
                 for child in children {
-                    try? fm.trashItem(at: child, resultingItemURL: nil)
+                    let size = folderSize(child)
+                    do {
+                        try fm.trashItem(at: child, resultingItemURL: nil)
+                        freed += size
+                    } catch {
+                        skipped += 1
+                    }
                 }
-                freed += item.bytes
+            }
+            DispatchQueue.main.async {
+                let freedText = ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)
+                status = skipped == 0
+                    ? "Moved \(freedText) of browser cache to Trash."
+                    : "Moved \(freedText) of browser cache to Trash. Skipped \(skipped) item(s) in use — quit the browser and try again."
+                scan()
             }
         }
-        status = "Moved \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)) of browser cache to Trash."
-        scan()
     }
 
     private func folderSize(_ url: URL) -> Int64 {

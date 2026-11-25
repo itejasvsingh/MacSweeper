@@ -108,10 +108,10 @@ final class FileScanner {
                 paths: [lib.appendingPathComponent("Group Containers/group.net.whatsapp.WhatsApp.shared/Message/Media")]
             ),
             CleanupTarget(
-                name: "Telegram Local Cache",
+                name: "Telegram Local Data",
                 category: .messaging,
-                safety: .safe,
-                explanation: "Cached media and files. Your chats and media remain safely stored in Telegram's cloud.",
+                safety: .caution,
+                explanation: "Telegram's whole local container, including its database. Cloud chats re-download, but you'll be logged out and Secret Chats (stored only on this Mac) will be lost. Prefer Telegram → Settings → Data and Storage → Storage Usage → Clear Cache.",
                 paths: [lib.appendingPathComponent("Group Containers/6N38VWS5BX.ru.keepcoder.Telegram")]
             ),
             CleanupTarget(
@@ -132,15 +132,29 @@ final class FileScanner {
     }
 
     static func scanTargets() -> [CleanupTarget] {
+        let all = buildDefaultTargets()
+        let allPaths = all.flatMap { $0.paths }.map { $0.standardizedFileURL.path }
+        var sizeCache: [String: Int64] = [:]
+        func cachedSize(_ path: String) -> Int64 {
+            if let s = sizeCache[path] { return s }
+            let s = directorySize(at: URL(fileURLWithPath: path))
+            sizeCache[path] = s
+            return s
+        }
+
         var results: [CleanupTarget] = []
-        for var target in buildDefaultTargets() {
+        for var target in all {
             var total: Int64 = 0
             var anyExists = false
-            for path in target.paths {
-                if fm.fileExists(atPath: path.path) {
-                    anyExists = true
-                    total += directorySize(at: path)
-                }
+            for url in target.paths {
+                let path = url.standardizedFileURL.path
+                guard fm.fileExists(atPath: path) else { continue }
+                anyExists = true
+                // Don't count space twice: e.g. ~/Library/Caches contains Caches/Homebrew
+                // and Caches/pip, which are already reported as their own targets.
+                let nested = allPaths.filter { $0 != path && $0.hasPrefix(path + "/") && fm.fileExists(atPath: $0) }
+                let nestedBytes = nested.reduce(Int64(0)) { $0 + cachedSize($1) }
+                total += max(0, cachedSize(path) - nestedBytes)
             }
             target.sizeBytes = total
             target.exists = anyExists && total > 0

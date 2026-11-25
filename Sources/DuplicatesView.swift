@@ -31,7 +31,7 @@ struct DuplicatesView: View {
             }
 
             if isScanning {
-                ProgressView("Comparing file sizes and SHA-256 hashes...")
+                ProgressView("Comparing file sizes and SHA-256 hashes... (oldest copy in each group is kept as the original)")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if groups.isEmpty {
                 Spacer()
@@ -106,7 +106,9 @@ struct DuplicatesView: View {
                     }
                 }
                 for (hash, dupes) in byHash where dupes.count > 1 {
-                    found.append(DuplicateGroup(hash: hash, size: size, files: dupes))
+                    // Treat the oldest copy as the original so the one you made first is kept.
+                    let ordered = dupes.sorted { creationDate($0) < creationDate($1) }
+                    found.append(DuplicateGroup(hash: hash, size: size, files: ordered))
                 }
             }
             found.sort { $0.size > $1.size }
@@ -117,6 +119,10 @@ struct DuplicatesView: View {
                 self.status = found.isEmpty ? "No duplicates over 1 MB found." : "Found \(found.count) duplicate group(s)."
             }
         }
+    }
+
+    private func creationDate(_ url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantFuture
     }
 
     private func sha256(url: URL) -> String? {
@@ -133,7 +139,13 @@ struct DuplicatesView: View {
     }
 
     private func trashFile(_ url: URL, in groupID: UUID) {
-        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            status = "Moved \(url.lastPathComponent) to Trash."
+        } catch {
+            status = "Couldn't move \(url.lastPathComponent) to Trash: \(error.localizedDescription)"
+            return
+        }
         if let idx = groups.firstIndex(where: { $0.id == groupID }) {
             groups[idx].files.removeAll { $0 == url }
             if groups[idx].files.count <= 1 {

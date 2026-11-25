@@ -30,10 +30,10 @@ You don't need any tech experience—just copy and paste one line:
 2. Copy the line below, paste it into the Terminal window, and press **Return**:
 
 ```bash
-curl -fsSL [https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh](https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh) | bash
+curl -fsSL https://raw.githubusercontent.com/itejasvsingh/MacSweeper/main/install.sh | bash
 ```
 
-MacSweeper will automatically download, install into your **Applications** folder, and open for you.
+MacSweeper will automatically download, verify the download's checksum, install into your **Applications** folder, and open for you.
 
 ---
 
@@ -63,6 +63,9 @@ MacSweeper will automatically download, install into your **Applications** folde
 | **🗑️ Complete App Uninstaller** | Removes the app *and* all its hidden leftover files in `Library` together, with a live search bar. |
 | **⚡ SmartDelete** | Quietly watches your Trash—when you drag an app to the Trash in Finder, MacSweeper offers to clean up its leftover files automatically. |
 | **🚀 Startup Items Manager** | Lists background apps that launch when you turn on your Mac so you can remove ones slowing you down. |
+| **🌐 Browser Cleaner** | Clears Chrome, Safari, Arc, Brave, Firefox, and Edge caches without touching passwords, bookmarks, or logins. |
+| **📑 Duplicate Finder** | Finds identical files over 1 MB in Downloads, Desktop, and Documents, keeping the oldest copy as the original. |
+| **🔭 Space Lens & RAM/CPU** *(Advanced Tools)* | Drill into folders by size, and see or quit the apps using the most memory or CPU. Turn on in Settings. |
 | **🐳 Docker & 🍺 Homebrew** | Automatically appears only if you have Docker or Homebrew installed, letting you prune unused images and caches in one click. |
 | **🔄 Automatic Updates** | Checks for new versions automatically and updates itself with one click (**Install & Relaunch**). |
 
