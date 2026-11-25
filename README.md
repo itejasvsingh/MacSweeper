@@ -1,10 +1,26 @@
-# MacSweeper
+<div align="center">
+  <img src="Assets/logo.png" alt="MacSweeper Logo" width="128" />
+  <h1>MacSweeper</h1>
+  <p><strong>A free, lightweight Mac app to reclaim "System Data", find large forgotten files, and completely uninstall apps.</strong></p>
 
-A free, simple Mac app that frees up storage space, removes junk files, and completely uninstalls apps you no longer need.
+  <p>
+    <img src="https://img.shields.io/badge/macOS-13.0%2B-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 13+" />
+    <a href="https://github.com/itejasvsingh/MacSweeper/releases/latest">
+      <img src="https://img.shields.io/github/v/release/itejasvsingh/MacSweeper?style=for-the-badge&color=007AFF" alt="Latest Release" />
+    </a>
+    <img src="https://img.shields.io/badge/100%25%20Free-Open%20Source-34C759?style=for-the-badge" alt="Free & Open Source" />
+  </p>
+
+  <p>
+    <a href="#-how-to-install"><strong>Install Now</strong></a> •
+    <a href="#-what-macsweeper-does"><strong>Features</strong></a> •
+    <a href="#-privacy--security"><strong>Privacy & Security</strong></a>
+  </p>
+</div>
 
 ---
 
-## How to Install
+## 🚀 How to Install
 
 ### Option 1: Fastest Way (Recommended — No Mac Popups)
 You don't need any tech experience—just copy and paste one line:
@@ -22,27 +38,37 @@ MacSweeper will automatically download, install into your **Applications** folde
 ---
 
 ### Option 2: Download from Your Browser
-1. **[Click here to download MacSweeper](https://github.com/itejasvsingh/MacSweeper/releases/latest/download/MacSweeper.zip)**
+1. **[Click here to download MacSweeper.zip](https://github.com/itejasvsingh/MacSweeper/releases/latest/download/MacSweeper.zip)**
 2. Double-click the downloaded **MacSweeper.zip** file to unzip it.
 3. Drag **MacSweeper** into your **Applications** folder.
 
-> **Seeing a "MacSweeper is damaged" message?**  
-> Don't worry—the app is not actually damaged! Because MacSweeper is a free, independent app (not sold on the Mac App Store), macOS blocks browser downloads by default.  
-> To allow it once: open **Terminal** (press **⌘ + Space**, type **Terminal**, press **Return**), paste this line, and press **Return**:
+> **Seeing a *"MacSweeper is damaged"* message?**  
+> Don't worry—the app is not actually damaged. Because MacSweeper is a free, independent app (not sold on the Mac App Store), macOS blocks browser downloads by default.  
+> To allow it once, open **Terminal** (**⌘ + Space** → type **Terminal** → press **Return**), paste this line, and press **Return**:
 > ```bash
 > xattr -cr /Applications/MacSweeper.app
 > ```
-> Then open **MacSweeper** from your Applications folder normally.
+> Then open **MacSweeper** from your **Applications** folder normally.
 
 ---
 
-## What MacSweeper Does
-- **Frees Up "System Data":** Finds hidden cache files, old logs, and temporary data safely—with green **Safe** badges so you always know what's okay to remove.
-- **Finds Large & Forgotten Files:** Scans your Downloads, Desktop, and Documents for huge files and old installers taking up space.
-- **Completely Uninstalls Apps:** Deleting an app normally leaves hidden junk behind. MacSweeper removes the app *and* all its leftover files together.
-- **SmartDelete:** Automatically notices when you drag an app to the Trash and offers to clean up its leftover files for you.
-- **Startup Manager:** Shows background apps that launch when you turn on your Mac so you can remove ones you don't need.
-- **Automatic Updates:** Checks for new versions automatically and updates itself with one click.
+## ✨ What MacSweeper Does
 
-## Is It Safe?
-Yes. MacSweeper **never permanently deletes your files**—everything you clean is moved to your regular Mac **Trash**, so you can always put something back if you change your mind.
+| Feature | How It Helps |
+| :--- | :--- |
+| **🧹 System Data Cleaner** | Finds hidden caches, old logs, and temporary files with green **Safe** badges—plus tips to shrink Time Machine snapshots and large hidden folders. |
+| **📦 Large & Old Files** | Scans your **Downloads**, **Desktop**, and **Documents** for huge files, forgotten `.dmg` installers, and old `.zip` archives. |
+| **🗑️ Complete App Uninstaller** | Removes the app *and* all its hidden leftover files in `Library` together, with a live search bar. |
+| **⚡ SmartDelete** | Quietly watches your Trash—when you drag an app to the Trash in Finder, MacSweeper offers to clean up its leftover files automatically. |
+| **🚀 Startup Items Manager** | Lists background apps that launch when you turn on your Mac so you can remove ones slowing you down. |
+| **🐳 Docker & 🍺 Homebrew** | Automatically appears only if you have Docker or Homebrew installed, letting you prune unused images and caches in one click. |
+| **🔄 Automatic Updates** | Checks for new versions automatically and updates itself with one click (**Install & Relaunch**). |
+
+---
+
+## 🔒 Privacy & Security
+
+* **Moves to Trash First:** MacSweeper never silently deletes your files—everything you clean goes to your regular Mac **Trash** so you can always recover it if you change your mind.
+* **Zero Tracking:** The app collects no analytics, no personal data, and no file lists. Its only internet connection is checking GitHub for app updates.
+* **100% Open & Transparent:** Every release is built publicly from this source code by GitHub's servers. Anyone can inspect the exact code that runs on their Mac.
+* **Why Full Disk Access?** macOS protects certain folders (like WhatsApp/Telegram caches) by default. Granting Full Disk Access is optional and only used locally on your Mac to scan those folders.
