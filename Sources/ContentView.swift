@@ -38,37 +38,71 @@ final class SweeperViewModel: ObservableObject {
     @Published var updateAlertTitle = ""
     @Published var updateAlertMessage = ""
     @Published var updateDownloadURL: URL?
+    @Published var updateIsZip = false
+    @Published var isInstallingUpdate = false
 
     init() {
         refreshDiskSpace()
+        checkForUpdates(silentIfUpToDate: true)
     }
 
-    func checkForUpdates() {
+    func checkForUpdates(silentIfUpToDate: Bool = false) {
         guard !isCheckingUpdates else { return }
         isCheckingUpdates = true
-        statusMessage = "Checking GitHub Releases for updates..."
+        if !silentIfUpToDate {
+            statusMessage = "Checking GitHub Releases for updates..."
+        }
 
         Task {
             let result = await UpdateChecker.checkForUpdates()
             self.isCheckingUpdates = false
             switch result {
-            case .updateAvailable(let version, let url):
+            case .updateAvailable(let version, let url, let isZip):
                 self.updateAlertTitle = "Update Available (v\(version))"
-                self.updateAlertMessage = "A newer version of MacSweeper is available on GitHub. Download the new .dmg and drag it to Applications to update."
+                self.updateAlertMessage = isZip
+                    ? "A newer version of MacSweeper is ready. Click Install & Relaunch to update automatically."
+                    : "A newer version of MacSweeper is available on GitHub."
                 self.updateDownloadURL = url
+                self.updateIsZip = isZip
                 self.statusMessage = "Update available: v\(version)"
+                self.showUpdateAlert = true
             case .upToDate(let current):
-                self.updateAlertTitle = "You're Up to Date"
-                self.updateAlertMessage = "MacSweeper v\(current) is the latest version."
-                self.updateDownloadURL = nil
-                self.statusMessage = "MacSweeper v\(current) is up to date."
+                if !silentIfUpToDate {
+                    self.updateAlertTitle = "You're Up to Date"
+                    self.updateAlertMessage = "MacSweeper v\(current) is the latest version."
+                    self.updateDownloadURL = nil
+                    self.updateIsZip = false
+                    self.statusMessage = "MacSweeper v\(current) is up to date."
+                    self.showUpdateAlert = true
+                }
             case .error(let msg):
-                self.updateAlertTitle = "Update Check Failed"
-                self.updateAlertMessage = msg
-                self.updateDownloadURL = nil
-                self.statusMessage = msg
+                if !silentIfUpToDate {
+                    self.updateAlertTitle = "Update Check Failed"
+                    self.updateAlertMessage = msg
+                    self.updateDownloadURL = nil
+                    self.updateIsZip = false
+                    self.statusMessage = msg
+                    self.showUpdateAlert = true
+                }
             }
-            self.showUpdateAlert = true
+        }
+    }
+
+    func installPendingUpdate() {
+        guard let url = updateDownloadURL else { return }
+        if !updateIsZip {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        isInstallingUpdate = true
+        statusMessage = "Downloading and installing update..."
+        Task {
+            do {
+                try await UpdateChecker.installZipUpdate(from: url)
+            } catch {
+                self.isInstallingUpdate = false
+                self.statusMessage = "Update failed: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -343,9 +377,9 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 580)
         .alert(vm.updateAlertTitle, isPresented: $vm.showUpdateAlert) {
-            if let url = vm.updateDownloadURL {
-                Button("Download Update") {
-                    NSWorkspace.shared.open(url)
+            if vm.updateDownloadURL != nil {
+                Button(vm.updateIsZip ? "Install & Relaunch" : "Download Update") {
+                    vm.installPendingUpdate()
                 }
                 Button("Later", role: .cancel) {}
             } else {

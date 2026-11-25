@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 struct GitHubAsset: Decodable {
     let name: String
@@ -12,7 +13,7 @@ struct GitHubRelease: Decodable {
 }
 
 enum UpdateCheckResult {
-    case updateAvailable(version: String, downloadURL: URL)
+    case updateAvailable(version: String, downloadURL: URL, isZip: Bool)
     case upToDate(current: String)
     case error(String)
 }
@@ -21,7 +22,7 @@ final class UpdateChecker {
     static let repo = "itejasvsingh/MacSweeper"
 
     static var currentVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.4"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.5.0"
     }
 
     static func checkForUpdates() async -> UpdateCheckResult {
@@ -47,15 +48,63 @@ final class UpdateChecker {
             let current = currentVersion.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
 
             if isVersion(latest, newerThan: current) {
-                let dmgURLString = release.assets.first(where: { $0.name.lowercased().hasSuffix(".dmg") })?.browser_download_url
-                let targetString = dmgURLString ?? release.html_url
-                if let downloadURL = URL(string: targetString) {
-                    return .updateAvailable(version: latest, downloadURL: downloadURL)
+                if let zipAsset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".zip") }),
+                   let zipURL = URL(string: zipAsset.browser_download_url) {
+                    return .updateAvailable(version: latest, downloadURL: zipURL, isZip: true)
+                }
+                if let fallback = URL(string: release.html_url) {
+                    return .updateAvailable(version: latest, downloadURL: fallback, isZip: false)
                 }
             }
             return .upToDate(current: current)
         } catch {
             return .error("Could not reach GitHub: \(error.localizedDescription)")
+        }
+    }
+
+    static func installZipUpdate(from zipURL: URL) async throws {
+        let fm = FileManager.default
+        let tempDir = URL(fileURLWithPath: "/tmp/MacSweeperUpdate-\(UUID().uuidString)")
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let (downloadedFile, _) = try await URLSession.shared.download(from: zipURL)
+        let localZip = tempDir.appendingPathComponent("MacSweeper.zip")
+        try fm.moveItem(at: downloadedFile, to: localZip)
+
+        let unzip = Process()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        unzip.arguments = ["-xk", localZip.path, tempDir.path]
+        try unzip.run()
+        unzip.waitUntilExit()
+        guard unzip.terminationStatus == 0 else {
+            throw NSError(domain: "MacSweeper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to extract update zip."])
+        }
+
+        let newAppPath = tempDir.appendingPathComponent("MacSweeper.app").path
+        guard fm.fileExists(atPath: newAppPath) else {
+            throw NSError(domain: "MacSweeper", code: 2, userInfo: [NSLocalizedDescriptionKey: "MacSweeper.app not found inside update zip."])
+        }
+
+        let targetAppPath = Bundle.main.bundlePath.hasSuffix(".app") ? Bundle.main.bundlePath : "/Applications/MacSweeper.app"
+        let pid = ProcessInfo.processInfo.processIdentifier
+
+        // Detached shell script waits for current app to exit, swaps the bundle, clears quarantine, and relaunches
+        let script = """
+        while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
+        rm -rf '\(targetAppPath)'
+        mv '\(newAppPath)' '\(targetAppPath)'
+        xattr -cr '\(targetAppPath)' 2>/dev/null || true
+        rm -rf '\(tempDir.path)'
+        open '\(targetAppPath)'
+        """
+
+        let updater = Process()
+        updater.executableURL = URL(fileURLWithPath: "/bin/sh")
+        updater.arguments = ["-c", script]
+        try updater.run()
+
+        await MainActor.run {
+            NSApp.terminate(nil)
         }
     }
 

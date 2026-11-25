@@ -1,0 +1,104 @@
+name: Build and Release MacSweeper
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set version
+        run: echo "APP_VERSION=1.5.${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Generate App Icon
+        run: |
+          cat << 'SWIFT' > /tmp/make_icon.swift
+          import AppKit
+
+          let iconset = "/tmp/MacSweeper.iconset"
+          try? FileManager.default.removeItem(atPath: iconset)
+          try! FileManager.default.createDirectory(atPath: iconset, withIntermediateDirectories: true)
+
+          let sizes: [(String, Int)] = [
+              ("icon_16x16.png", 16), ("icon_16x16@2x.png", 32),
+              ("icon_32x32.png", 32), ("icon_32x32@2x.png", 64),
+              ("icon_128x128.png", 128), ("icon_128x128@2x.png", 256),
+              ("icon_256x256.png", 256), ("icon_256x256@2x.png", 512),
+              ("icon_512x512.png", 512), ("icon_512x512@2x.png", 1024)
+          ]
+
+          for (name, px) in sizes {
+              let size = CGFloat(px)
+              let img = NSImage(size: NSSize(width: size, height: size))
+              img.lockFocus()
+              let rect = NSRect(x: size * 0.08, y: size * 0.08, width: size * 0.84, height: size * 0.84)
+              let path = NSBezierPath(roundedRect: rect, xRadius: size * 0.2, yRadius: size * 0.2)
+              let grad = NSGradient(starting: NSColor(red: 0.14, green: 0.45, blue: 0.96, alpha: 1.0),
+                                    ending: NSColor(red: 0.35, green: 0.18, blue: 0.88, alpha: 1.0))!
+              grad.draw(in: path, angle: -45)
+              if let sym = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil) {
+                  let cfg = NSImage.SymbolConfiguration(pointSize: size * 0.42, weight: .bold)
+                  let tinted = sym.withSymbolConfiguration(cfg)!
+                  let rep = NSImage(size: tinted.size)
+                  rep.lockFocus()
+                  NSColor.white.set()
+                  let symRect = NSRect(origin: .zero, size: tinted.size)
+                  tinted.draw(in: symRect)
+                  symRect.fill(using: .sourceAtop)
+                  rep.unlockFocus()
+                  let x = (size - rep.size.width) / 2
+                  let y = (size - rep.size.height) / 2
+                  rep.draw(in: NSRect(x: x, y: y, width: rep.size.width, height: rep.size.height))
+              }
+              img.unlockFocus()
+              if let tiff = img.tiffRepresentation,
+                 let bitmap = NSBitmapImageRep(data: tiff),
+                 let png = bitmap.representation(using: .png, properties: [:]) {
+                  try! png.write(to: URL(fileURLWithPath: "\(iconset)/\(name)"))
+              }
+          }
+          SWIFT
+          swift /tmp/make_icon.swift
+          iconutil -c icns /tmp/MacSweeper.iconset -o /tmp/AppIcon.icns
+
+      - name: Package MacSweeper.app and zip
+        run: |
+          mkdir -p dist/MacSweeper.app/Contents/MacOS dist/MacSweeper.app/Contents/Resources
+          cp .build/release/MacSweeper dist/MacSweeper.app/Contents/MacOS/MacSweeper
+          cp /tmp/AppIcon.icns dist/MacSweeper.app/Contents/Resources/AppIcon.icns
+          cat << PLIST > dist/MacSweeper.app/Contents/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key><string>MacSweeper</string>
+              <key>CFBundleIdentifier</key><string>com.local.macsweeper</string>
+              <key>CFBundleName</key><string>MacSweeper</string>
+              <key>CFBundleIconFile</key><string>AppIcon</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
+              <key>LSMinimumSystemVersion</key><string>13.0</string>
+          </dict>
+          </plist>
+          PLIST
+          ditto -c -k --sequesterRsrc --keepParent dist/MacSweeper.app dist/MacSweeper.zip
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: MacSweeper v${{ env.APP_VERSION }}
+          generate_release_notes: true
+          files: dist/MacSweeper.zip
